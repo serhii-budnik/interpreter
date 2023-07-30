@@ -82,13 +82,13 @@ impl<'a> Parser<'a> {
                         }));
                     },
                     token => return {
-                        self.peek_error(token);
+                        self.peek_error(Token::Assign);
                         None
                     },
                 }
             },
             token => {
-                self.peek_error(token);
+                self.peek_error(Token::Ident("<variable_name>".to_string()));
                 None
             },
         }
@@ -125,6 +125,8 @@ mod test {
 
         let program = parser.parse_program();
 
+        assert_eq!(parser.errors().is_empty(), true);
+
         if program.statements.len() != 3 {
             panic!("statmnets does not contains 3 statemnts got ={}", program.statements.len());
         }
@@ -147,5 +149,43 @@ mod test {
         for (index, test) in tests.iter().enumerate() {
             assert_eq!(test_let_statement(test, &program.statements[index]), true)
         }
+    }
+
+    #[test]
+    fn returns_errors_when_missing_assign_char() {
+        let input = r#"
+            let x = 5;
+            let y 10;
+            let foobar = 848484;
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let _ = parser.parse_program();
+
+        assert_eq!(
+            parser.errors(),
+            &vec![r#"expected next token to be Assign, got Int("10") instead"#]
+        );
+    }
+
+    #[test]
+    fn returns_errors_when_missing_ident_char() {
+        let input = r#"
+            let x = 5;
+            let = 10;
+            let foobar = 848484;
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let _ = parser.parse_program();
+
+        assert_eq!(
+            parser.errors(),
+            &vec![r#"expected next token to be Ident("<variable_name>"), got Assign instead"#],
+        );
     }
 }

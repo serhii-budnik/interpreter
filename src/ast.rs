@@ -1,8 +1,9 @@
 use crate::token::Token;
 
 pub trait Node {
-    // this method is needed for debugging
+    // these methods are needed for debugging
     fn token(&self) -> Token;
+    fn to_string(&self) -> String;
 }
 
 pub trait Statement: Node {
@@ -23,6 +24,14 @@ pub struct LetStatement {
     pub value: Box<dyn Expression>,
 }
 
+pub struct ReturnStatement {
+    pub value: Box<dyn Expression>,
+}
+
+pub struct ExpressionStatement {
+    pub expression: Box<dyn Expression>,
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Identifier {
     pub token: Token,
@@ -38,6 +47,10 @@ impl Expression for Identifier {
 impl Node for Identifier {
     fn token(&self) -> Token {
         self.token.clone()
+    }
+
+    fn to_string(&self) -> String {
+        self.value.clone()
     }
 }
 
@@ -55,6 +68,30 @@ impl Node for LetStatement {
     fn token(&self) -> Token {
        Token::Let
     }
+
+    fn to_string(&self) -> String {
+        format!("{} {} = {};", self.token(), self.name.to_string(), self.value.to_string())
+    }
+}
+
+impl Statement for ReturnStatement {
+    fn name(&self) -> &Identifier {
+        todo!()
+    }
+
+    fn statement_node(&self) -> Box<dyn Statement> {
+        todo!()
+    }
+}
+
+impl Node for ReturnStatement {
+    fn token(&self) -> Token {
+        Token::Return
+    }
+
+    fn to_string(&self) -> String {
+        format!("{} {};", self.token(), self.value.to_string())
+    }
 }
 
 impl Node for Program {
@@ -64,5 +101,41 @@ impl Node for Program {
         } else {
             return Token::Eof;
         }
+    }
+
+    fn to_string(&self) -> String {
+        self.statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::token::Token;
+    use crate::ast::{Program, LetStatement, Identifier, Node, ReturnStatement };
+
+    #[test]
+    fn to_string_converts_let_statement_to_readable_code() {
+        let program = Program {
+            statements: vec![
+                Box::new(LetStatement {
+                    name: Identifier {
+                        token: Token::Let, 
+                        value: "myVar".to_string(),
+                    },
+                    value: Box::new(Identifier {
+                        token: Token::Ident("anotherVar".to_string()),
+                        value: "anotherVar".to_string(),
+                    }),
+                }),
+                Box::new(ReturnStatement {
+                    value: Box::new(Identifier {
+                        token: Token::Ident("myVar".to_string()),
+                        value: "myVar".to_string(),
+                    }),
+                }),
+            ],
+        };
+
+        assert_eq!(program.to_string(), "let myVar = anotherVar;\nreturn myVar;");
     }
 }

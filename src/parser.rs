@@ -1,7 +1,7 @@
 use crate::{
     lexer::Lexer,
     token::Token,
-    ast::{Program, Identifier, LetStatement, Statement},
+    ast::{Program, Identifier, LetStatement, Statement, ReturnStatement},
 };
 
 #[allow(dead_code)]
@@ -55,6 +55,7 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
         match self.cur_token {
             Token::Let => self.parse_let_statement(),
+            Token::Return => self.parse_return_statement(),
             _ => None
         }
     }
@@ -93,12 +94,27 @@ impl<'a> Parser<'a> {
             },
         }
     }
+
+    fn parse_return_statement(&mut self) -> Option<Box<dyn Statement>> {
+        self.next_token();
+
+        // TODO: We're skipping the expressioin until we encouter a semicolon
+        while self.cur_token != Token::Semicolon {
+            self.next_token();
+        }
+
+        Some(Box::new(ReturnStatement {
+            value: Box::new(
+                Identifier { token: Token::Int("42".into()), value: "42".into() }
+            ),
+        }))
+    }
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
-        ast::{Identifier, Node, LetStatement, Statement},
+        ast::{Identifier, ReturnStatement, Node, LetStatement, Statement},
         lexer::Lexer,
         parser::Parser,
         token::Token,
@@ -126,10 +142,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-
-        if program.statements.len() != 3 {
-            panic!("statmnets does not contains 3 statemnts got ={}", program.statements.len());
-        }
+        assert_eq!(program.statements.len(), 3);
 
         let tests = [
             LetStatement {
@@ -148,6 +161,39 @@ mod test {
 
         for (index, test) in tests.iter().enumerate() {
             assert_eq!(test_let_statement(test, &program.statements[index]), true)
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let input = r#"
+            return 5;
+            return 10;
+            return 993322;
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        assert_eq!(parser.errors().is_empty(), true);
+        assert_eq!(program.statements.len(), 3);
+
+        let tests = [
+            ReturnStatement {
+                value: Box::new(Identifier { token: Token::Int("5".into()), value: "5".into()})
+            },
+            ReturnStatement {
+                value: Box::new(Identifier { token: Token::Int("10".into()), value: "10".into()})
+            },
+            ReturnStatement {
+                value: Box::new(Identifier { token: Token::Int("848484".into()), value: "993322".into()})
+            },
+        ];
+
+        for (index, test) in tests.iter().enumerate() {
+            assert_eq!(test.token(), program.statements[index].token());
         }
     }
 

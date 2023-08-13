@@ -21,7 +21,9 @@ pub fn start() {
             let token = lexer.next_token();
             if let Token::Eof = token { break };
 
-            println!("{:?}", token);
+            print!("{} ", token);
         }
+
+        println!("")
     }
 }

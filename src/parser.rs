@@ -1,7 +1,16 @@
 use crate::{
     lexer::Lexer,
     token::Token,
-    ast::{Program, Identifier, LetStatement, Statement, ReturnStatement, ExpressionStatement, Expression},
+    ast::{
+        Program,
+        Identifier,
+        LetStatement,
+        Statement,
+        ReturnStatement,
+        ExpressionStatement,
+        Expression,
+        IntegerLiteral
+    },
 };
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -90,7 +99,7 @@ impl<'a> Parser<'a> {
 
                 match self.peek_token.clone() { 
                     Token::Assign => {
-                        let identifier = Identifier { token: self.cur_token.clone(), value: ident };
+                        let identifier = Identifier { token: self.cur_token.take(), value: ident };
 
                         // TODO: We're skipping the expressioin until we encouter a semicolon
                         self.skip_until_semicolon();
@@ -154,7 +163,38 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self, _precedence: Precedence) -> Result<Box<dyn Expression>, String> {
-        self.cur_token.take().parse_prefix()
+        self.parse_prefix()
+    }
+
+    fn parse_identifier(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.cur_token.take();
+        Ok(Box::new(Identifier { value: token.to_string(), token }))
+    }
+
+    #[allow(dead_code)]
+    fn parse_integer_literal(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.cur_token.take();
+        let res = token.parse_integer();
+
+        if let Err(err) = res {
+            self.add_error(err.clone());
+
+            return Err(err);
+        }
+
+        let int = res.unwrap();
+
+        Ok(Box::new(
+            IntegerLiteral { token, value: int }
+        ))
+    }
+
+    pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
+        match &self.cur_token {
+            Token::Ident(_) => self.parse_identifier(),
+            Token::Int(_) => self.parse_integer_literal(),
+            token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
+        }
     }
 }
 
@@ -253,9 +293,27 @@ mod test {
 
         let program = parser.parse_program();
 
+        assert_eq!(parser.errors.is_empty(), true);
+
         assert_eq!(program.statements.len(), 1);
         assert_eq!(program.statements[0].token(), Token::Ident("foobar".to_string()));
         assert_eq!(program.statements[0].to_string(), "foobar");
+    }
+
+    #[test]
+    fn test_integer_literal_expression() {
+        let input = "5;";
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        assert_eq!(parser.errors.is_empty(), true);
+
+        assert_eq!(program.statements.len(), 1);
+        assert_eq!(program.statements[0].token(), Token::Int("5".to_string()));
+        assert_eq!(program.statements[0].to_string(), "5");
     }
 
     #[test]

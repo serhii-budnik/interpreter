@@ -1,6 +1,6 @@
 use std::{fmt::Display, mem};
 
-use crate::ast::{Identifier, Expression};
+use crate::ast::{Identifier, Expression, IntegerLiteral};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token { 
@@ -58,15 +58,16 @@ impl Token {
         }
     }
 
-    pub fn parse_prefix(self) -> Result<Box<dyn Expression>, String> {
-        match self {
-            Self::Ident(_) => Ok(Box::new(
-                Identifier { value: self.to_string(), token: self }
-            )),
-            token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
+    pub fn parse_integer(&self) -> Result<i64, String> {
+        if let Token::Int(val) = self {
+            return match val.parse::<i64>() {
+                Ok(int) => Ok(int),
+                Err(err) => Err(format!("expected integer, got {:?}", err)),
+            }
         }
-    }
 
+        Err(format!("expected token to parse Token::Int, got {:?}", self))
+    }
 
     pub fn take(&mut self) -> Self {
         mem::take(self)

@@ -32,6 +32,11 @@ pub struct ExpressionStatement {
     pub expression: Box<dyn Expression>,
 }
 
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: i64,
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Identifier {
     pub token: Token,
@@ -125,6 +130,22 @@ impl Statement for ExpressionStatement {
     }
 
     fn statement_node(&self) -> Box<dyn Statement> {
+        todo!()
+    }
+}
+
+impl Node for IntegerLiteral {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn to_string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+impl Expression for IntegerLiteral {
+    fn expression_node(&self) -> Box<dyn Expression> {
         todo!()
     }
 }

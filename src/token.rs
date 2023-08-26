@@ -1,4 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, mem};
+
+use crate::ast::{Identifier, Expression};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token { 
@@ -37,6 +39,9 @@ pub enum Token {
     If,
     Else,
     Return,
+
+    // smth to put instead of value that was taken to fool borrow checker
+    _Taken,
 }
 
 impl Token {
@@ -51,6 +56,26 @@ impl Token {
             "false" => Token::False,
             _ => Token::Ident(ident.into()),
         }
+    }
+
+    pub fn parse_prefix(self) -> Result<Box<dyn Expression>, String> {
+        match self {
+            Self::Ident(_) => Ok(Box::new(
+                Identifier { value: self.to_string(), token: self }
+            )),
+            token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
+        }
+    }
+
+
+    pub fn take(&mut self) -> Self {
+        mem::take(self)
+    }
+}
+
+impl Default for Token {
+    fn default() -> Self {
+        Self::_Taken
     }
 }
 
@@ -83,9 +108,27 @@ impl Display for Token {
             Self::If => "if",
             Self::Else => "else",
             Self::Return => "return",
+            Self::_Taken => panic!(
+                "Token::_Taken is the stub value that was replaced in memory. Should not be stringified"
+            ),
         };
 
         write!(f, "{}", stringified_token)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::token::Token;
+
+    #[test]
+    fn take_method_swaps_value_in_memory() {
+        let mut token = Token::Eq;
+
+        let taken_token = token.take();
+
+        assert_eq!(taken_token, Token::Eq);
+        assert_eq!(token, Token::_Taken);
     }
 }
 

@@ -28,7 +28,7 @@ impl<'a> Lexer<'a> {
         };
         l.read_char();
         l
-    } 
+    }
 
     fn read_char(&mut self) -> Option<char> {
         self.ch = self.chars.next();
@@ -102,9 +102,9 @@ impl<'a> Lexer<'a> {
         identifier
     }
 
-    fn read_number(&mut self) -> String { 
+    fn read_number(&mut self) -> String {
         let mut number = String::new();
-         
+
         while let Some(ch) = self.ch  {
             if !self.is_digit(ch) { break }
 
@@ -118,7 +118,7 @@ impl<'a> Lexer<'a> {
     fn is_letter(&self, ch: char) -> bool {
         ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
     }
-    
+
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.ch {
             match ch {
@@ -127,8 +127,8 @@ impl<'a> Lexer<'a> {
             };
         };
     }
-    
-    fn is_digit(&self, ch: char) -> bool { 
+
+    fn is_digit(&self, ch: char) -> bool {
         ('0'..='9').contains(&ch)
     }
 }

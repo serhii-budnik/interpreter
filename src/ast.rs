@@ -35,6 +35,7 @@ pub struct ExpressionStatement {
 #[derive(PartialEq, Debug)]
 pub struct Identifier {
     pub token: Token,
+    // value just duplicate of token Ident(value). Let's keep it for now, maybe we can delete it later
     pub value: String,
 }
 
@@ -50,7 +51,7 @@ impl Node for Identifier {
     }
 
     fn to_string(&self) -> String {
-        self.value.clone()
+        self.token.to_string()
     }
 }
 
@@ -108,6 +109,26 @@ impl Node for Program {
     }
 }
 
+impl Node for ExpressionStatement {
+    fn token(&self) -> Token {
+        self.expression.token()
+    }
+
+    fn to_string(&self) -> String {
+        self.expression.to_string()
+    }
+}
+
+impl Statement for ExpressionStatement {
+    fn name(&self) -> &Identifier {
+        todo!()
+    }
+
+    fn statement_node(&self) -> Box<dyn Statement> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::token::Token;
@@ -119,7 +140,7 @@ mod test {
             statements: vec![
                 Box::new(LetStatement {
                     name: Identifier {
-                        token: Token::Let, 
+                        token: Token::Ident("myVar".to_string()),
                         value: "myVar".to_string(),
                     },
                     value: Box::new(Identifier {

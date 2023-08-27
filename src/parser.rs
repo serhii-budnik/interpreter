@@ -19,7 +19,7 @@ use crate::{
 pub enum Precedence {
     Lowest,
     Equals, // ==, !=
-	LessGreater, // > or <
+    LessGreater, // > or <
     Sum, // +
     Product, // *
     Prefix, // -X or !X

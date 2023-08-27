@@ -208,7 +208,7 @@ mod test {
         PrefixExpression,
         Program,
         ReturnStatement,
-    InfixExpression,
+        InfixExpression,
     };
 
     #[test]

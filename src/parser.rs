@@ -228,7 +228,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod test {
     use crate::{
-        ast::{Identifier, ReturnStatement, Node, LetStatement, Statement},
+        ast::{Identifier, ReturnStatement, Node, LetStatement, Statement, PrefixExpression, IntegerLiteral},
         lexer::Lexer,
         parser::Parser,
         token::Token,
@@ -383,7 +383,35 @@ mod test {
 
     #[test]
     fn test_parsing_prefix_expression() {
-        todo!()
-        // page 59 or do it yourself ;)
+        let input = r#"
+            !9
+            -10
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        assert_eq!(parser.errors().is_empty(), true);
+        assert_eq!(program.statements.len(), 2);
+
+        let tests = [
+            PrefixExpression {
+                token: Token::Bang,
+                operator: "!".to_string(),
+                right: Box::new(IntegerLiteral { token: Token::Int("9".into()), value: 9 })
+            },
+            PrefixExpression {
+                token: Token::Minus,
+                operator: "-".to_string(),
+                right: Box::new(IntegerLiteral { token: Token::Int("10".into()), value: 10 })
+            },
+        ];
+
+        for (index, test) in tests.iter().enumerate() {
+            assert_eq!(test.token(), program.statements[index].token());
+            assert_eq!(test.to_string(), program.statements[index].to_string());
+        }
     }
 }

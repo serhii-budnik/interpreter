@@ -1,5 +1,7 @@
 use std::{fmt::Display, mem};
 
+use crate::parser::Precedence;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token { 
     Illegal,
@@ -67,6 +69,16 @@ impl Token {
         Err(format!("expected token to parse Token::Int, got {:?}", self))
     }
 
+    pub fn map_precedence(&self) -> Precedence {
+        match self {
+            Self::Eq | Self::NotEq => Precedence::Equals,
+            Self::LessThen | Self::GreaterThen => Precedence::LessGreater,
+            Self::Plus | Self::Minus => Precedence::Sum,
+            Self::Slash | Self::Asterisk => Precedence::Product,
+            _ => Precedence::Lowest,
+        }
+    }
+
     pub fn take(&mut self) -> Self {
         mem::take(self)
     }
@@ -108,7 +120,7 @@ impl Display for Token {
             Self::Else => "else",
             Self::Return => "return",
             Self::_Taken => panic!(
-                "Token::_Taken is the stub value that was replaced in memory. Should not be stringified"
+                "Token::_Taken is the stub that was filled instead of moved value. Should not be stringified"
             ),
         };
 

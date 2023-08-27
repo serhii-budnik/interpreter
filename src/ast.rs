@@ -43,6 +43,14 @@ pub struct PrefixExpression {
     pub right: Box<dyn Expression>,
 }
 
+pub struct InfixExpression {
+    pub token: Token,
+    pub operator: String,
+
+    pub left: Box<dyn Expression>,
+    pub right: Box<dyn Expression>,
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Identifier {
     pub token: Token,
@@ -172,18 +180,35 @@ impl Expression for PrefixExpression {
     }
 }
 
+impl Node for InfixExpression {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn to_string(&self) -> String {
+        format!("({} {} {})", self.left.to_string(), self.token.to_string(), self.right.to_string())
+    }
+}
+
+impl Expression for InfixExpression {
+    fn expression_node(&self) -> Box<dyn Expression> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::token::Token;
     use super::{
         ExpressionStatement,
+        Identifier,
+        IntegerLiteral,
+        LetStatement,
+        Node,
         PrefixExpression,
         Program,
-        LetStatement,
-        Identifier,
-        Node,
         ReturnStatement,
-        IntegerLiteral,
+    InfixExpression,
     };
 
     #[test]
@@ -240,5 +265,29 @@ mod test {
         };
 
         assert_eq!(program.to_string(), "(!myVar)\n(-4)");
+    }
+
+    #[test]
+    fn to_string_converts_infix_expression_to_readable_code() {
+        let program = Program {
+            statements: vec![
+                Box::new(ExpressionStatement {
+                    expression: Box::new(InfixExpression {
+                        token: Token::Plus,
+                        operator: "+".to_string(),
+                        left: Box::new(IntegerLiteral {
+                            token: Token::Int("4".to_string()),
+                            value: 4,
+                        }),
+                        right: Box::new(Identifier {
+                            token: Token::Int("x".to_string()),
+                            value: "x".to_string(),
+                        }),
+                    }),
+                })
+            ]
+        };
+
+        assert_eq!(program.to_string(), "(4 + x)");
     }
 }

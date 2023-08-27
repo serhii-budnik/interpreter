@@ -1,7 +1,5 @@
 use std::{fmt::Display, mem};
 
-use crate::ast::{Identifier, Expression, IntegerLiteral};
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token { 
     Illegal,

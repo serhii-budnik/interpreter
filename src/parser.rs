@@ -2,25 +2,26 @@ use crate::{
     lexer::Lexer,
     token::Token,
     ast::{
-        Program,
-        Identifier,
-        LetStatement,
-        Statement,
-        ReturnStatement,
-        ExpressionStatement,
         Expression,
-        IntegerLiteral
+        ExpressionStatement,
+        Identifier,
+        IntegerLiteral,
+        LetStatement,
+        PrefixExpression,
+        Program,
+        ReturnStatement,
+        Statement,
     },
 };
 
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
-    LOWEST,
-    EQUALS, // == LESSGREATER // > or <
-    SUM, // +
-    PRODUCT, // *
-    PREFIX, // -X or !X
-    CALL, // myFunction(X)
+    Lowest,
+    Equals, // == LESSGREATER // > or <
+    Sum, // +
+    Product, // *
+    Prefix, // -X or !X
+    Call, // myFunction(X)
 }
 
 #[allow(dead_code)]
@@ -143,7 +144,7 @@ impl<'a> Parser<'a> {
 
     #[allow(dead_code)]
     fn parse_expression_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let result = self.parse_expression(Precedence::LOWEST);
+        let result = self.parse_expression(Precedence::Lowest);
 
         if let Err(err) = result {
             self.add_error(err);
@@ -189,10 +190,36 @@ impl<'a> Parser<'a> {
         ))
     }
 
+    fn parse_prefix_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.cur_token.take();
+        let operator = token.to_string();
+
+        self.next_token();
+
+        let result = self.parse_expression(Precedence::Prefix);
+
+        if let Err(err) = result {
+            self.add_error(err.clone());
+
+            return Err(err);
+        }
+
+        let right = result.unwrap();
+
+        Ok(Box::new(
+            PrefixExpression {
+                token,
+                operator,
+                right,
+            }
+        ))
+    }
+
     pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
         match &self.cur_token {
             Token::Ident(_) => self.parse_identifier(),
             Token::Int(_) => self.parse_integer_literal(),
+            Token::Bang | Token::Minus => self.parse_prefix_expression(),
             token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
         }
     }
@@ -352,5 +379,11 @@ mod test {
             parser.errors(),
             &vec![r#"expected next token to be Ident("<variable_name>"), got Assign instead"#],
         );
+    }
+
+    #[test]
+    fn test_parsing_prefix_expression() {
+        todo!()
+        // page 59 or do it yourself ;)
     }
 }

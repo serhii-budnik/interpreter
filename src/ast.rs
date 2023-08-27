@@ -37,6 +37,12 @@ pub struct IntegerLiteral {
     pub value: i64,
 }
 
+pub struct PrefixExpression {
+    pub token: Token,
+    pub operator: String,
+    pub right: Box<dyn Expression>,
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Identifier {
     pub token: Token,
@@ -150,10 +156,35 @@ impl Expression for IntegerLiteral {
     }
 }
 
+impl Node for PrefixExpression {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+
+    fn to_string(&self) -> String {
+        format!("({}{})", self.token.to_string(), self.right.to_string())
+    }
+}
+
+impl Expression for PrefixExpression {
+    fn expression_node(&self) -> Box<dyn Expression> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::token::Token;
-    use crate::ast::{Program, LetStatement, Identifier, Node, ReturnStatement };
+    use super::{
+        ExpressionStatement,
+        PrefixExpression,
+        Program,
+        LetStatement,
+        Identifier,
+        Node,
+        ReturnStatement,
+        IntegerLiteral,
+    };
 
     #[test]
     fn to_string_converts_let_statement_to_readable_code() {
@@ -179,5 +210,35 @@ mod test {
         };
 
         assert_eq!(program.to_string(), "let myVar = anotherVar;\nreturn myVar;");
+    }
+
+    #[test]
+    fn to_string_converts_prefix_expression_to_readable_code() {
+        let program = Program {
+            statements: vec![
+                Box::new(ExpressionStatement { 
+                    expression: Box::new(PrefixExpression {
+                        token: Token::Bang,
+                        operator: "!".to_string(),
+                        right: Box::new(Identifier {
+                            token: Token::Ident("myVar".to_string()),
+                            value: "myVar".to_string(),
+                        }),
+                    }),
+                }),
+                Box::new(ExpressionStatement { 
+                    expression: Box::new(PrefixExpression {
+                        token: Token::Minus,
+                        operator: "-".to_string(),
+                        right: Box::new(IntegerLiteral {
+                            token: Token::Int("4".to_string()),
+                            value: 4,
+                        }),
+                    }),
+                }),
+            ]
+        };
+
+        assert_eq!(program.to_string(), "(!myVar)\n(-4)");
     }
 }

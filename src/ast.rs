@@ -1,9 +1,9 @@
 use crate::token::Token;
+use std::fmt::{Display, Debug};
 
-pub trait Node {
-    // these methods are needed for debugging
+pub trait Node: Display + Debug {
+    // this method is needed for debugging
     fn token(&self) -> Token;
-    fn to_string(&self) -> String;
 }
 
 pub trait Statement: Node {
@@ -32,6 +32,7 @@ pub struct ExpressionStatement {
     pub expression: Box<dyn Expression>,
 }
 
+#[derive(Debug)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: i64,
@@ -51,7 +52,7 @@ pub struct InfixExpression {
     pub right: Box<dyn Expression>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct Identifier {
     pub token: Token,
     // value just duplicate of token Ident(value). Let's keep it for now, maybe we can delete it later
@@ -68,9 +69,11 @@ impl Node for Identifier {
     fn token(&self) -> Token {
         self.token.clone()
     }
+}
 
-    fn to_string(&self) -> String {
-        self.token.to_string()
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token)
     }
 }
 
@@ -88,9 +91,20 @@ impl Node for LetStatement {
     fn token(&self) -> Token {
        Token::Let
     }
+}
 
-    fn to_string(&self) -> String {
-        format!("{} {} = {};", self.token(), self.name.to_string(), self.value.to_string())
+impl Display for LetStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {} = {};", self.token(), self.name, self.value)
+    }
+}
+
+impl Debug for LetStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LetStatement")
+            .field("name", &format_args!("{:#?}", self.name))
+            .field("value", &format_args!("{:#?}", self.value))
+            .finish()
     }
 }
 
@@ -108,9 +122,20 @@ impl Node for ReturnStatement {
     fn token(&self) -> Token {
         Token::Return
     }
+}
 
-    fn to_string(&self) -> String {
-        format!("{} {};", self.token(), self.value.to_string())
+impl Display for ReturnStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {};", self.token(), self.value)
+    }
+}
+
+
+impl Debug for ReturnStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReturnStatement")
+            .field("value", &format_args!("{:#?}", self.value))
+            .finish()
     }
 }
 
@@ -122,19 +147,32 @@ impl Node for Program {
             return Token::Eof;
         }
     }
+}
 
-    fn to_string(&self) -> String {
-        self.statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")
+impl Display for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")
+        )
+    }
+}
+
+
+impl Debug for Program {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.statements.iter().map(|statement| format!("{:#?}", statement)).collect::<Vec<String>>().join("\n")
+        )
     }
 }
 
 impl Node for ExpressionStatement {
     fn token(&self) -> Token {
         self.expression.token()
-    }
-
-    fn to_string(&self) -> String {
-        self.expression.to_string()
     }
 }
 
@@ -148,13 +186,24 @@ impl Statement for ExpressionStatement {
     }
 }
 
+impl Display for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.expression)
+    }
+}
+
+
+impl Debug for ExpressionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExpressionStatement")
+            .field("expression", &format_args!("{:#?}", self.expression))
+            .finish()
+    }
+}
+
 impl Node for IntegerLiteral {
     fn token(&self) -> Token {
         self.token.clone()
-    }
-
-    fn to_string(&self) -> String {
-        self.value.to_string()
     }
 }
 
@@ -164,13 +213,15 @@ impl Expression for IntegerLiteral {
     }
 }
 
+impl Display for IntegerLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
 impl Node for PrefixExpression {
     fn token(&self) -> Token {
         self.token.clone()
-    }
-
-    fn to_string(&self) -> String {
-        format!("({}{})", self.token.to_string(), self.right.to_string())
     }
 }
 
@@ -180,19 +231,48 @@ impl Expression for PrefixExpression {
     }
 }
 
+impl Display for PrefixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}{})", self.token.to_string(), self.right)
+    }
+}
+
+impl Debug for PrefixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrefixExpression")
+            .field("token", &self.token)
+            .field("operator", &self.operator)
+            .field("right", &self.right)
+            .finish()
+    }
+}
+
 impl Node for InfixExpression {
     fn token(&self) -> Token {
         self.token.clone()
-    }
-
-    fn to_string(&self) -> String {
-        format!("({} {} {})", self.left.to_string(), self.token.to_string(), self.right.to_string())
     }
 }
 
 impl Expression for InfixExpression {
     fn expression_node(&self) -> Box<dyn Expression> {
         todo!()
+    }
+}
+
+impl Display for InfixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.left, self.token.to_string(), self.right)
+    }
+}
+
+impl Debug for InfixExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InfixExpression")
+            .field("token", &self.token)
+            .field("operator", &self.operator)
+            .field("left", &format_args!("{:#?}", self.left))
+            .field("right", &format_args!("{:#?}", self.right))
+            .finish()
     }
 }
 
@@ -204,7 +284,6 @@ mod test {
         Identifier,
         IntegerLiteral,
         LetStatement,
-        Node,
         PrefixExpression,
         Program,
         ReturnStatement,

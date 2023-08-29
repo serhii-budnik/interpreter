@@ -38,6 +38,12 @@ pub struct IntegerLiteral {
     pub value: i64,
 }
 
+#[derive(Debug)]
+pub struct Boolean {
+    pub token: Token,
+    pub value: bool,
+}
+
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: String,
@@ -216,6 +222,24 @@ impl Expression for IntegerLiteral {
 impl Display for IntegerLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value)
+    }
+}
+
+impl Node for Boolean {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+}
+
+impl Expression for Boolean {
+    fn expression_node(&self) -> Box<dyn Expression> {
+        todo!()
+    }
+}
+
+impl Display for Boolean {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.token)
     }
 }
 

@@ -2,6 +2,7 @@ use crate::{
     lexer::Lexer,
     token::Token,
     ast::{
+        Boolean,
         Expression,
         ExpressionStatement,
         Identifier,
@@ -76,6 +77,10 @@ impl<'a> Parser<'a> {
 
     fn skip_until_semicolon(&mut self) {
         while self.cur_token != Token::Semicolon { self.next_token() }
+    }
+
+    fn is_cur_token(&self, token: Token) -> bool {
+        self.cur_token == token
     }
 
     #[allow(dead_code)]
@@ -253,11 +258,16 @@ impl<'a> Parser<'a> {
         }))
     }
 
+    pub fn parse_boolean(&mut self) -> Result<Box<dyn Expression>, String> {
+        Ok(Box::new(Boolean { value: self.is_cur_token(Token::True), token: self.cur_token.take() }))
+    }
+
     pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
         match &self.cur_token {
             Token::Ident(_) => self.parse_identifier(),
             Token::Int(_) => self.parse_integer_literal(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
+            Token::True | Token::False => self.parse_boolean(),
             token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
         }
     }
@@ -286,14 +296,15 @@ impl<'a> Parser<'a> {
 mod test {
     use crate::{
         ast::{
+            Boolean,
             Identifier,
-            ReturnStatement,
-            Node,
-            LetStatement,
-            Statement,
-            PrefixExpression,
+            InfixExpression,
             IntegerLiteral,
-            InfixExpression
+            LetStatement,
+            Node,
+            PrefixExpression,
+            ReturnStatement,
+            Statement,
         },
         lexer::Lexer,
         parser::Parser,
@@ -452,6 +463,8 @@ mod test {
         let input = r#"
             !9;
             -10;
+            !true;
+            !false;
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -460,7 +473,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-        assert_eq!(program.statements.len(), 2);
+        assert_eq!(program.statements.len(), 4);
 
         let tests = [
             PrefixExpression {
@@ -472,6 +485,16 @@ mod test {
                 token: Token::Minus,
                 operator: "-".to_string(),
                 right: Box::new(IntegerLiteral { token: Token::Int("10".into()), value: 10 })
+            },
+            PrefixExpression {
+                token: Token::Bang,
+                operator: "!".to_string(),
+                right: Box::new(Boolean { token: Token::True, value: true })
+            },
+            PrefixExpression {
+                token: Token::Bang,
+                operator: "!".to_string(),
+                right: Box::new(Boolean { token: Token::False, value: false })
             },
         ];
 
@@ -576,6 +599,8 @@ mod test {
             5 > 4 == 3 < 4;
             5 < 4 != 3 > 4;
             3 + 4 * 5 == 3 * 1 + 4 * 5;
+            3 > 5 == false;
+            3 < 5 == true;
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -598,6 +623,30 @@ mod test {
             "((5 > 4) == (3 < 4))",
             "((5 < 4) != (3 > 4))",
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            "((3 > 5) == false)",
+            "((3 < 5) == true)",
+        ].iter().map(|s| s.to_string());
+
+        for (index, test) in tests.enumerate() {
+            assert_eq!(program.statements[index].to_string(), test);
+        }
+    }
+
+    #[test]
+    fn test_boolean_parsing() {
+        let input = r#"
+            false;
+            true;
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        let tests = [
+            "false",
+            "true",
         ].iter().map(|s| s.to_string());
 
         for (index, test) in tests.enumerate() {

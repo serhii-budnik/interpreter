@@ -2,10 +2,12 @@ use crate::{
     lexer::Lexer,
     token::Token,
     ast::{
+        BlockStatement,
         Boolean,
         Expression,
         ExpressionStatement,
         Identifier,
+        IfExpression,
         InfixExpression,
         IntegerLiteral,
         LetStatement,
@@ -276,6 +278,54 @@ impl<'a> Parser<'a> {
         Ok(exp)
     }
 
+    pub fn parse_if_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        if self.peek_token != Token::Lparen { 
+            return Err(self.peek_err_msg(Token::Lparen));
+        }
+
+        self.next_token();
+
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        let consequence = self.parse_block_statement()?;
+
+        Ok(Box::new(IfExpression {
+            token: Token::If,
+            condition,
+            consequence,
+            alternative: None,
+        }))
+    }
+
+    pub fn parse_block_statement(&mut self) -> Result<BlockStatement, String> {
+        if self.peek_token != Token::Lbrace {
+            return Err(self.peek_err_msg(Token::Lbrace));
+        }
+
+        self.next_token();
+
+        let mut statements = Vec::new();
+
+        while self.peek_token != Token::Rbrace {
+            self.next_token();
+
+            if let Some(exp_st) = self.parse_expression_statement() {
+                statements.push(exp_st);
+            }
+        }
+
+        if self.peek_token != Token::Rbrace {
+            return Err(self.peek_err_msg(Token::Rbrace));
+        }
+
+        self.next_token();
+
+        Ok(BlockStatement {
+            token: Token::Lbrace,
+            statements
+        })
+    }
+
     pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
         match &self.cur_token {
             Token::Ident(_) => self.parse_identifier(),
@@ -283,6 +333,7 @@ impl<'a> Parser<'a> {
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             Token::True | Token::False => self.parse_boolean(),
             Token::Lparen => self.parse_grouped_expression(),
+            Token::If => self.parse_if_expression(),
             token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
         }
     }
@@ -312,6 +363,7 @@ mod test {
     use crate::{
         ast::{
             Boolean,
+            ExpressionStatement,
             Identifier,
             InfixExpression,
             IntegerLiteral,
@@ -416,7 +468,7 @@ mod test {
 
         assert_eq!(program.statements.len(), 1);
         assert_eq!(program.statements[0].token(), Token::Ident("foobar".to_string()));
-        assert_eq!(program.statements[0].to_string(), "foobar");
+        assert_eq!(program.statements[0].to_string(), "foobar;");
     }
 
     #[test]
@@ -432,7 +484,7 @@ mod test {
 
         assert_eq!(program.statements.len(), 1);
         assert_eq!(program.statements[0].token(), Token::Int("5".to_string()));
-        assert_eq!(program.statements[0].to_string(), "5");
+        assert_eq!(program.statements[0].to_string(), "5;");
     }
 
     #[test]
@@ -491,25 +543,33 @@ mod test {
         assert_eq!(program.statements.len(), 4);
 
         let tests = [
-            PrefixExpression {
-                token: Token::Bang,
-                operator: "!".to_string(),
-                right: Box::new(IntegerLiteral { token: Token::Int("9".into()), value: 9 })
+            ExpressionStatement {
+                expression: Box::new(PrefixExpression {
+                    token: Token::Bang,
+                    operator: "!".to_string(),
+                    right: Box::new(IntegerLiteral { token: Token::Int("9".into()), value: 9 })
+                })
             },
-            PrefixExpression {
-                token: Token::Minus,
-                operator: "-".to_string(),
-                right: Box::new(IntegerLiteral { token: Token::Int("10".into()), value: 10 })
+            ExpressionStatement {
+                expression: Box::new(PrefixExpression {
+                    token: Token::Minus,
+                    operator: "-".to_string(),
+                    right: Box::new(IntegerLiteral { token: Token::Int("10".into()), value: 10 })
+                }),
             },
-            PrefixExpression {
-                token: Token::Bang,
-                operator: "!".to_string(),
-                right: Box::new(Boolean { token: Token::True, value: true })
+            ExpressionStatement {
+                expression: Box::new(PrefixExpression {
+                    token: Token::Bang,
+                    operator: "!".to_string(),
+                    right: Box::new(Boolean { token: Token::True, value: true })
+                }),
             },
-            PrefixExpression {
-                token: Token::Bang,
-                operator: "!".to_string(),
-                right: Box::new(Boolean { token: Token::False, value: false })
+            ExpressionStatement {
+                expression: Box::new(PrefixExpression {
+                    token: Token::Bang,
+                    operator: "!".to_string(),
+                    right: Box::new(Boolean { token: Token::False, value: false })
+                }),
             },
         ];
 
@@ -541,53 +601,69 @@ mod test {
         assert_eq!(program.statements.len(), 8);
 
         let tests = [
-            InfixExpression {
-                token: Token::Plus,
-                operator: "+".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement {
+                expression: Box::new(InfixExpression {
+                    token: Token::Plus,
+                    operator: "+".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::Minus,
-                operator: "-".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement {
+                expression: Box::new(InfixExpression {
+                    token: Token::Minus,
+                    operator: "-".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::Asterisk,
-                operator: "*".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement { 
+                expression: Box::new(InfixExpression {
+                    token: Token::Asterisk,
+                    operator: "*".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::Slash,
-                operator: "/".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement { 
+                expression: Box::new(InfixExpression {
+                    token: Token::Slash,
+                    operator: "/".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::GreaterThen,
-                operator: ">".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement { 
+                expression: Box::new(InfixExpression {
+                    token: Token::GreaterThen,
+                    operator: ">".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::LessThen,
-                operator: "<".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement { 
+                expression: Box::new(InfixExpression {
+                    token: Token::LessThen,
+                    operator: "<".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::Eq,
-                operator: "==".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement { 
+                expression: Box::new(InfixExpression {
+                    token: Token::Eq,
+                    operator: "==".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
-            InfixExpression {
-                token: Token::NotEq,
-                operator: "!=".to_string(),
-                left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
-                right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+            ExpressionStatement { 
+                expression: Box::new(InfixExpression {
+                    token: Token::NotEq,
+                    operator: "!=".to_string(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("4".into()), value: 4 }),
+                    right: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                }),
             },
         ];
 
@@ -629,27 +705,27 @@ mod test {
         let program = parser.parse_program();
 
         let tests = [
-            "((-a) * b)",
-            "(!(-a))",
-            "((a + b) + c)",
-            "((a + b) - c)",
-            "((a * b) * c)",
-            "((a * b) / c)",
-            "(a + (b / c))",
-            "(a + (b * c))",
-            "(((a + (b * c)) + (d / e)) - f)",
-            "(3 + 4)",
-            "((-5) * 5)",
-            "((5 > 4) == (3 < 4))",
-            "((5 < 4) != (3 > 4))",
-            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-            "((3 > 5) == false)",
-            "((3 < 5) == true)",
-            "((1 + (2 + 3)) + 4)",
-            "((5 + 5) * 2)",
-            "(2 / (5 + 5))",
-            "(-(5 + 5))",
-            "(!(true == true))"
+            "((-a) * b);",
+            "(!(-a));",
+            "((a + b) + c);",
+            "((a + b) - c);",
+            "((a * b) * c);",
+            "((a * b) / c);",
+            "(a + (b / c));",
+            "(a + (b * c));",
+            "(((a + (b * c)) + (d / e)) - f);",
+            "(3 + 4);",
+            "((-5) * 5);",
+            "((5 > 4) == (3 < 4));",
+            "((5 < 4) != (3 > 4));",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));",
+            "((3 > 5) == false);",
+            "((3 < 5) == true);",
+            "((1 + (2 + 3)) + 4);",
+            "((5 + 5) * 2);",
+            "(2 / (5 + 5));",
+            "(-(5 + 5));",
+            "(!(true == true));"
         ].iter().map(|s| s.to_string());
 
         assert_eq!(parser.errors(), &Vec::<String>::new());
@@ -672,8 +748,8 @@ mod test {
         let program = parser.parse_program();
 
         let tests = [
-            "false",
-            "true",
+            "false;",
+            "true;",
         ].iter().map(|s| s.to_string());
 
         for (index, test) in tests.enumerate() {
@@ -699,7 +775,26 @@ mod test {
 
     #[test]
     fn test_if_expression() {
+        let input = r#"
+            if (x < y) { x };
+            if (x < y) { x; x + y };
+        "#.trim();
 
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        assert_eq!(parser.errors.is_empty(), true);
+
+        let tests = [
+            "if (x < y) {\nx;\n};",
+            "if (x < y) {\nx;\n(x + y);\n};",
+        ].iter().map(|s| s.to_string());
+
+        for (index, test) in tests.enumerate() {
+            assert_eq!(program.statements[index].to_string(), test);
+        }
     }
 
     #[test]

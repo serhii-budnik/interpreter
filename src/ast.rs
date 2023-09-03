@@ -62,12 +62,12 @@ pub struct IfExpression {
     pub token: Token,
     pub condition: Box<dyn Expression>,
     pub consequence: BlockStatement,
-    pub alternative: BlockStatement,
+    pub alternative: Option<BlockStatement>,
 }
 
 pub struct BlockStatement {
-    token: Token,
-    statements: Vec<Box<dyn Statement>>,
+    pub token: Token,
+    pub statements: Vec<Box<dyn Statement>>,
 }
 
 #[derive(Debug)]
@@ -206,10 +206,9 @@ impl Statement for ExpressionStatement {
 
 impl Display for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.expression)
+        write!(f, "{};", self.expression)
     }
 }
-
 
 impl Debug for ExpressionStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -318,6 +317,12 @@ impl Node for IfExpression {
     }
 }
 
+impl Expression for IfExpression {
+    fn expression_node(&self) -> Box<dyn Expression> {
+        todo!()
+    }
+}
+
 impl Debug for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IfExpression")
@@ -329,7 +334,22 @@ impl Debug for IfExpression {
 
 impl Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "if ({}) {{ }} else {{ }}", &self.condition)
+        if let Some(alternative) = &self.alternative {
+            write!(
+                f,
+                "if {} {} else {}",
+                &self.condition,
+                &self.consequence,
+                &alternative
+            )
+        } else {
+            write!(
+                f,
+                "if {} {}",
+                &self.condition,
+                &self.consequence
+            )
+        }
     }
 }
 
@@ -425,7 +445,7 @@ mod test {
             ]
         };
 
-        assert_eq!(program.to_string(), "(!myVar)\n(-4)");
+        assert_eq!(program.to_string(), "(!myVar);\n(-4);");
     }
 
     #[test]
@@ -449,6 +469,6 @@ mod test {
             ]
         };
 
-        assert_eq!(program.to_string(), "(4 + x)");
+        assert_eq!(program.to_string(), "(4 + x);");
     }
 }

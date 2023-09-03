@@ -16,6 +16,8 @@ use crate::{
     },
 };
 
+use std::mem;
+
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
     Lowest,
@@ -27,7 +29,7 @@ pub enum Precedence {
     Call, // myFunction(X)
 }
 
-#[allow(dead_code)]
+#[derive(Debug)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
 
@@ -57,8 +59,12 @@ impl<'a> Parser<'a> {
         self.errors.push(err);
     }
 
+    fn peek_err_msg(&self, token: Token) -> String {
+       format!("expected next token to be {:?}, got {:?} instead", &token, &self.peek_token)
+    }
+
     fn peek_error(&mut self, token: Token) {
-        let err = format!("expected next token to be {:?}, got {:?} instead", &token, &self.peek_token);
+        let err = self.peek_err_msg(token);
         self.add_error(err);
     }
 
@@ -71,16 +77,12 @@ impl<'a> Parser<'a> {
     }
 
     fn next_token(&mut self) {
-        self.cur_token = self.peek_token.clone();
+        mem::swap(&mut self.cur_token, &mut self.peek_token);
         self.peek_token = self.lexer.next_token();
     }
 
     fn skip_until_semicolon(&mut self) {
         while self.cur_token != Token::Semicolon { self.next_token() }
-    }
-
-    fn is_cur_token(&self, token: Token) -> bool {
-        self.cur_token == token
     }
 
     #[allow(dead_code)]
@@ -106,38 +108,33 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> { 
-        match self.peek_token.clone() { 
-            Token::Ident(ident) => {
-                self.next_token();
+    fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
+        let ident = if let Token::Ident(ident) = self.peek_token.clone() {
+            self.next_token();
+            ident
+        } else {
+            self.peek_error(Token::Ident("<variable_name>".to_string()));
+            self.skip_until_semicolon();
+            return None
+        };
 
-                match self.peek_token.clone() { 
-                    Token::Assign => {
-                        let identifier = Identifier { token: self.cur_token.take(), value: ident };
+        if let Token::Assign = self.peek_token.clone() {
+            let identifier = Identifier { token: self.cur_token.take(), value: ident };
 
-                        // TODO: We're skipping the expressioin until we encouter a semicolon
-                        self.skip_until_semicolon();
+            // TODO: We're skipping the expressioin until we encouter a semicolon
+            self.skip_until_semicolon();
 
-                        return Some(Box::new(LetStatement {
-                            name: identifier,
-                            value: Box::new(Identifier {
-                                token: Token::Int("42".into()),
-                                value: "42".into(),
-                            }),
-                        }));
-                    },
-                    _ => return {
-                        self.peek_error(Token::Assign);
-                        self.skip_until_semicolon();
-                        None
-                    },
-                }
-            },
-            _ => {
-                self.peek_error(Token::Ident("<variable_name>".to_string()));
-                self.skip_until_semicolon();
-                None
-            },
+            Some(Box::new(LetStatement {
+                name: identifier,
+                value: Box::new(Identifier {
+                    token: Token::Int("42".into()),
+                    value: "42".into(),
+                }),
+            }))
+        } else {
+            self.peek_error(Token::Assign);
+            self.skip_until_semicolon();
+            None
         }
     }
 
@@ -259,7 +256,24 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_boolean(&mut self) -> Result<Box<dyn Expression>, String> {
-        Ok(Box::new(Boolean { value: self.is_cur_token(Token::True), token: self.cur_token.take() }))
+        Ok(Box::new(Boolean { value: self.cur_token == Token::True, token: self.cur_token.take() }))
+    }
+
+    pub fn parse_grouped_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        self.next_token();
+
+        let exp = self.parse_expression(Precedence::Lowest)?;
+
+        if let Token::Rparen = self.peek_token {
+            self.next_token();
+        } else {
+            let err_msg = self.peek_err_msg(Token::Rparen);
+
+            self.skip_until_semicolon();
+            return Err(err_msg)
+        }
+
+        Ok(exp)
     }
 
     pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
@@ -268,6 +282,7 @@ impl<'a> Parser<'a> {
             Token::Int(_) => self.parse_integer_literal(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             Token::True | Token::False => self.parse_boolean(),
+            Token::Lparen => self.parse_grouped_expression(),
             token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
         }
     }
@@ -601,6 +616,11 @@ mod test {
             3 + 4 * 5 == 3 * 1 + 4 * 5;
             3 > 5 == false;
             3 < 5 == true;
+            1 + (2 + 3) + 4;
+            (5 + 5) * 2;
+            2 / (5 + 5);
+            -(5 + 5);
+            !(true == true);
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -625,7 +645,14 @@ mod test {
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             "((3 > 5) == false)",
             "((3 < 5) == true)",
+            "((1 + (2 + 3)) + 4)",
+            "((5 + 5) * 2)",
+            "(2 / (5 + 5))",
+            "(-(5 + 5))",
+            "(!(true == true))"
         ].iter().map(|s| s.to_string());
+
+        assert_eq!(parser.errors(), &Vec::<String>::new());
 
         for (index, test) in tests.enumerate() {
             assert_eq!(program.statements[index].to_string(), test);
@@ -652,5 +679,21 @@ mod test {
         for (index, test) in tests.enumerate() {
             assert_eq!(program.statements[index].to_string(), test);
         }
+    }
+
+    #[test]
+    fn test_invalid_syntax_for_grouped_expression() {
+        let input = r#"
+            (5 + 5);
+            (9 + 1 ;
+            (2 + 2);
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let _ = parser.parse_program();
+
+        assert_eq!(parser.errors, vec!["expected next token to be Rparen, got Semicolon instead".to_string()]);
     }
 }

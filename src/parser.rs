@@ -696,4 +696,14 @@ mod test {
 
         assert_eq!(parser.errors, vec!["expected next token to be Rparen, got Semicolon instead".to_string()]);
     }
+
+    #[test]
+    fn test_if_expression() {
+
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+
+    }
 }

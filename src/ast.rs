@@ -58,6 +58,18 @@ pub struct InfixExpression {
     pub right: Box<dyn Expression>,
 }
 
+pub struct IfExpression {
+    pub token: Token,
+    pub condition: Box<dyn Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: BlockStatement,
+}
+
+pub struct BlockStatement {
+    token: Token,
+    statements: Vec<Box<dyn Statement>>,
+}
+
 #[derive(Debug)]
 pub struct Identifier {
     pub token: Token,
@@ -297,6 +309,52 @@ impl Debug for InfixExpression {
             .field("left", &format_args!("{:#?}", self.left))
             .field("right", &format_args!("{:#?}", self.right))
             .finish()
+    }
+}
+
+impl Node for IfExpression {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+}
+
+impl Debug for IfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IfExpression")
+            .field("token", &self.token)
+            .field("condition", &format_args!("{:#?}", self.condition))
+            .finish()
+    }
+}
+
+impl Display for IfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "if ({}) {{ }} else {{ }}", &self.condition)
+    }
+}
+
+impl Node for BlockStatement {
+    fn token(&self) -> Token {
+        self.token.clone()
+    }
+}
+
+impl Debug for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BlockStatement")
+            .field("token", &self.token)
+            .field("statements", &format_args!("{:#?}", self.statements))
+            .finish()
+    }
+}
+
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{{\n{}\n}}",
+            self.statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")
+        )
     }
 }
 

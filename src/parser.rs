@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
 
         if let Err(err) = result {
             self.add_error(err);
-
+            self.skip_until_semicolon();
             return None;
         }
 
@@ -269,31 +269,34 @@ impl<'a> Parser<'a> {
         if let Token::Rparen = self.peek_token {
             self.next_token();
         } else {
-            let err_msg = self.peek_err_msg(Token::Rparen);
-
-            self.skip_until_semicolon();
-            return Err(err_msg)
+            return Err(self.peek_err_msg(Token::Rparen));
         }
 
         Ok(exp)
     }
 
     pub fn parse_if_expression(&mut self) -> Result<Box<dyn Expression>, String> {
-        if self.peek_token != Token::Lparen { 
+        if self.peek_token != Token::Lparen {
             return Err(self.peek_err_msg(Token::Lparen));
         }
 
         self.next_token();
 
         let condition = self.parse_expression(Precedence::Lowest)?;
-
         let consequence = self.parse_block_statement()?;
+        let mut alternative = None;
+
+        if self.peek_token == Token::Else {
+            self.next_token();
+
+            alternative = Some(self.parse_block_statement()?);
+        }
 
         Ok(Box::new(IfExpression {
             token: Token::If,
             condition,
             consequence,
-            alternative: None,
+            alternative,
         }))
     }
 
@@ -306,10 +309,10 @@ impl<'a> Parser<'a> {
 
         let mut statements = Vec::new();
 
-        while self.peek_token != Token::Rbrace {
+        while self.peek_token != Token::Rbrace && self.peek_token != Token::Eof {
             self.next_token();
 
-            if let Some(exp_st) = self.parse_expression_statement() {
+            if let Some(exp_st) = self.parse_statement() {
                 statements.push(exp_st);
             }
         }
@@ -334,7 +337,12 @@ impl<'a> Parser<'a> {
             Token::True | Token::False => self.parse_boolean(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
-            token => Err(format!("expected tokens to parse prefix are (Ident, ...), got {:?}", token)),
+            token => Err(
+                format!(
+                    "expected tokens to parse prefix are (Ident, Int, Bang, Minus, True, False, Lparen, If) got {:?}",
+                    token
+                )
+            ),
         }
     }
 
@@ -778,6 +786,8 @@ mod test {
         let input = r#"
             if (x < y) { x };
             if (x < y) { x; x + y };
+            if (x < y) { x } else { y };
+            if (x < y) { x } else { y; y + x };
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -790,6 +800,8 @@ mod test {
         let tests = [
             "if (x < y) {\nx;\n};",
             "if (x < y) {\nx;\n(x + y);\n};",
+            "if (x < y) {\nx;\n} else {\ny;\n};",
+            "if (x < y) {\nx;\n} else {\ny;\n(y + x);\n};",
         ].iter().map(|s| s.to_string());
 
         for (index, test) in tests.enumerate() {
@@ -798,7 +810,22 @@ mod test {
     }
 
     #[test]
-    fn test_if_else_expression() {
+    fn test_invalid_if_expression() {
+        let input = r#"
+            if x < y { x };
+            if (x < y) { x } else y;
+            if (x < y) { x;
+        "#.trim();
 
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let _ = parser.parse_program();
+
+        assert_eq!(parser.errors, vec![
+            "expected next token to be Lparen, got Ident(\"x\") instead".to_string(),
+            "expected next token to be Lbrace, got Ident(\"y\") instead".to_string(),
+            "expected next token to be Rbrace, got Eof instead".to_string(),
+        ]);
     }
 }

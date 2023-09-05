@@ -8,8 +8,6 @@ pub struct Lexer<'a> {
     input: &'a str,
     chars: Peekable<Chars<'a>>,
 
-    // maybe we can get rid of them later
-    position: u32,
     read_position: u32,
 
     ch: Option<char>,
@@ -31,6 +29,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn read_char(&mut self) -> Option<char> {
+        self.read_position += 1;
         self.ch = self.chars.next();
         self.ch
     }

@@ -21,7 +21,6 @@ impl<'a> Lexer<'a> {
             chars: input.chars().peekable(),
             input,
 
-            position: 0,
             read_position: 0,
         };
         l.read_char();

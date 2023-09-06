@@ -6,6 +6,7 @@ use crate::{
         Boolean,
         Expression,
         ExpressionStatement,
+        FnExpression,
         Identifier,
         IfExpression,
         InfixExpression,
@@ -84,7 +85,7 @@ impl<'a> Parser<'a> {
     }
 
     fn skip_until_semicolon(&mut self) {
-        while self.cur_token != Token::Semicolon { self.next_token() }
+        while self.cur_token != Token::Semicolon && self.cur_token != Token::Eof { self.next_token() }
     }
 
     #[allow(dead_code)]
@@ -106,33 +107,30 @@ impl<'a> Parser<'a> {
         match self.cur_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
+            Token::Semicolon => None,
             _ => self.parse_expression_statement(),
         }
     }
 
     fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let ident = if let Token::Ident(ident) = self.peek_token.clone() {
+        let identifier = if matches!(self.peek_token, Token::Ident(_)) {
             self.next_token();
-            ident
+
+            let token = self.cur_token.take();
+            Identifier { value: token.clone().value(), token }
         } else {
             self.peek_error(Token::Ident("<variable_name>".to_string()));
             self.skip_until_semicolon();
             return None
         };
 
-        if let Token::Assign = self.peek_token.clone() {
-            let identifier = Identifier { token: self.cur_token.take(), value: ident };
+        if let Token::Assign = self.peek_token {
+            self.next_token();
+            self.next_token();
 
-            // TODO: We're skipping the expressioin until we encouter a semicolon
-            self.skip_until_semicolon();
+            let value = self.parse_expression(Precedence::Lowest).unwrap();
 
-            Some(Box::new(LetStatement {
-                name: identifier,
-                value: Box::new(Identifier {
-                    token: Token::Int("42".into()),
-                    value: "42".into(),
-                }),
-            }))
+            Some(Box::new(LetStatement { name: identifier, value }))
         } else {
             self.peek_error(Token::Assign);
             self.skip_until_semicolon();
@@ -143,14 +141,9 @@ impl<'a> Parser<'a> {
     fn parse_return_statement(&mut self) -> Option<Box<dyn Statement>> {
         self.next_token();
 
-        // TODO: We're skipping the expressioin until we encouter a semicolon
-        self.skip_until_semicolon();
+        let value = self.parse_expression(Precedence::Lowest).unwrap();
 
-        Some(Box::new(ReturnStatement {
-            value: Box::new(
-                Identifier { token: Token::Int("42".into()), value: "42".into() }
-            ),
-        }))
+        Some(Box::new(ReturnStatement { value }))
     }
 
     fn parse_expression_statement(&mut self) -> Option<Box<dyn Statement>> {
@@ -283,10 +276,21 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let condition = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token != Token::Lbrace {
+            return Err(self.peek_err_msg(Token::Lbrace));
+        }
+        self.next_token();
+
         let consequence = self.parse_block_statement()?;
         let mut alternative = None;
 
         if self.peek_token == Token::Else {
+            self.next_token();
+
+            if self.peek_token != Token::Lbrace {
+                return Err(self.peek_err_msg(Token::Lbrace));
+            }
             self.next_token();
 
             alternative = Some(self.parse_block_statement()?);
@@ -301,12 +305,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_block_statement(&mut self) -> Result<BlockStatement, String> {
-        if self.peek_token != Token::Lbrace {
-            return Err(self.peek_err_msg(Token::Lbrace));
-        }
-
-        self.next_token();
-
         let mut statements = Vec::new();
 
         while self.peek_token != Token::Rbrace && self.peek_token != Token::Eof {
@@ -329,6 +327,52 @@ impl<'a> Parser<'a> {
         })
     }
 
+    pub fn parse_fn_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        if self.peek_token != Token::Lparen {
+            return Err(self.peek_err_msg(Token::Lparen));
+        }
+
+        self.next_token();
+
+        let params = self.parse_function_parameters()?;
+
+        if self.peek_token != Token::Lbrace {
+            return Err(self.peek_err_msg(Token::Lbrace));
+        }
+
+        self.next_token();
+
+        let body = self.parse_block_statement()?;
+
+        Ok(Box::new(FnExpression {
+            params,
+            body,
+        }))
+    }
+
+    pub fn parse_function_parameters(&mut self) -> Result<Vec<Box<dyn Expression>>, String> {
+        let mut identifiers = Vec::new();
+
+        while self.peek_token != Token::Rparen && self.peek_token != Token::Eof {
+            if !matches!(self.peek_token, Token::Ident(_)) {
+                return Err(self.peek_err_msg(Token::Ident("<param>".into())));
+            }
+
+            self.next_token();
+
+            let ident = self.parse_identifier()?;
+            identifiers.push(ident);
+
+            if self.peek_token == Token::Comma {
+                self.next_token();
+            }
+        }
+
+        self.next_token();
+
+        Ok(identifiers)
+    }
+
     pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
         match &self.cur_token {
             Token::Ident(_) => self.parse_identifier(),
@@ -337,6 +381,7 @@ impl<'a> Parser<'a> {
             Token::True | Token::False => self.parse_boolean(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
+            Token::Function => self.parse_fn_expression(),
             token => Err(
                 format!(
                     "expected tokens to parse prefix are (Ident, Int, Bang, Minus, True, False, Lparen, If) got {:?}",
@@ -413,15 +458,15 @@ mod test {
         let tests = [
             LetStatement {
                 name: Identifier { token: Token::Ident("x".to_string()), value: "x".to_string() },
-                value: Box::new(Identifier { token: Token::Int("5".into()), value: "5".into()})
+                value: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 })
             },
             LetStatement {
                 name: Identifier { token: Token::Ident("y".to_string()), value: "y".to_string() },
-                value: Box::new(Identifier { token: Token::Int("10".into()), value: "10".into()})
+                value: Box::new(IntegerLiteral { token: Token::Int("10".into()), value: 10 })
             },
             LetStatement {
                 name: Identifier { token: Token::Ident("foobar".to_string()), value: "foobar".to_string() },
-                value: Box::new(Identifier { token: Token::Int("848484".into()), value: "848484".into()})
+                value: Box::new(IntegerLiteral { token: Token::Int("848484".into()), value: 848484 })
             },
         ];
 
@@ -436,6 +481,7 @@ mod test {
             return 5;
             return 10;
             return 993322;
+            return 5 + x;
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -444,7 +490,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-        assert_eq!(program.statements.len(), 3);
+        assert_eq!(program.statements.len(), 4);
 
         let tests = [
             ReturnStatement {
@@ -454,12 +500,20 @@ mod test {
                 value: Box::new(Identifier { token: Token::Int("10".into()), value: "10".into()})
             },
             ReturnStatement {
-                value: Box::new(Identifier { token: Token::Int("848484".into()), value: "848484".into()})
+                value: Box::new(Identifier { token: Token::Int("993322".into()), value: "993322".into()})
+            },
+            ReturnStatement {
+                value: Box::new(InfixExpression {
+                    token: Token::Plus,
+                    operator: "+".into(),
+                    left: Box::new(IntegerLiteral { token: Token::Int("5".into()), value: 5 }),
+                    right: Box::new(Identifier { token: Token::Ident("x".into()), value: "x".into() }),
+                })
             },
         ];
 
         for (index, test) in tests.iter().enumerate() {
-            assert_eq!(test.token(), program.statements[index].token());
+            assert_eq!(test.to_string(), program.statements[index].to_string());
         }
     }
 
@@ -827,5 +881,27 @@ mod test {
             "expected next token to be Lbrace, got Ident(\"y\") instead".to_string(),
             "expected next token to be Rbrace, got Eof instead".to_string(),
         ]);
+    }
+
+    #[test]
+    fn test_fn_expression() {
+        let input = r#"
+            fn (x) { return x; }
+            fn (x, y) { return x + y; }
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        let tests = [
+            "fn(x) {\nreturn x;\n};",
+            "fn(x, y) {\nreturn (x + y);\n};",
+        ].iter().map(|s| s.to_string());
+
+        for (index, test) in tests.enumerate() {
+            assert_eq!(program.statements[index].to_string(), test);
+        }
     }
 }

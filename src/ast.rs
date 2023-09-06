@@ -65,6 +65,12 @@ pub struct IfExpression {
     pub alternative: Option<BlockStatement>,
 }
 
+#[derive(Debug)]
+pub struct FnExpression { 
+    pub params: Vec<Box<dyn Expression>>,
+    pub body: BlockStatement,
+}
+
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Box<dyn Statement>>,
@@ -353,6 +359,29 @@ impl Display for IfExpression {
     }
 }
 
+impl Node for FnExpression {
+    fn token(&self) -> Token {
+        Token::Function
+    }
+}
+
+impl Display for FnExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "fn({}) {}",
+            self.params.iter().map(|param| param.to_string()).collect::<Vec<String>>().join(", "),
+            self.body
+        )
+    }
+}
+
+impl Expression for FnExpression {
+    fn expression_node(&self) -> Box<dyn Expression> {
+        todo!()
+    }
+}
+
 impl Node for BlockStatement {
     fn token(&self) -> Token {
         self.token.clone()
@@ -383,13 +412,15 @@ mod test {
     use crate::token::Token;
     use super::{
         ExpressionStatement,
+        FnExpression,
         Identifier,
+        InfixExpression,
         IntegerLiteral,
         LetStatement,
         PrefixExpression,
         Program,
         ReturnStatement,
-        InfixExpression,
+        BlockStatement,
     };
 
     #[test]
@@ -470,5 +501,42 @@ mod test {
         };
 
         assert_eq!(program.to_string(), "(4 + x);");
+    }
+
+    #[test]
+    fn to_string_converts_fn_expression_to_readable_code() {
+        let program = FnExpression {
+            params: vec![
+                Box::new(Identifier {
+                    token: Token::Ident("x".to_string()),
+                    value: "x".to_string(),
+                }),
+                Box::new(Identifier {
+                    token: Token::Ident("y".to_string()),
+                    value: "y".to_string(),
+                }),
+            ],
+            body: BlockStatement {
+                token: Token::Lbrace,
+                statements: vec![
+                    Box::new(ExpressionStatement {
+                        expression: Box::new(InfixExpression {
+                            token: Token::Plus,
+                            operator: "+".to_string(),
+                            left: Box::new(Identifier {
+                                token: Token::Ident("x".to_string()),
+                                value: "x".to_string(),
+                            }),
+                            right: Box::new(Identifier {
+                                token: Token::Ident("y".to_string()),
+                                value: "y".to_string(),
+                            }),
+                        }),
+                    }),
+                ],
+            },
+        };
+
+        assert_eq!(program.to_string(), "fn(x, y) {\n(x + y);\n}");
     }
 }

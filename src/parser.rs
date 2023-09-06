@@ -4,6 +4,7 @@ use crate::{
     ast::{
         BlockStatement,
         Boolean,
+        CallExpression,
         Expression,
         ExpressionStatement,
         FnExpression,
@@ -373,6 +374,46 @@ impl<'a> Parser<'a> {
         Ok(identifiers)
     }
 
+    pub fn parse_call_expression(&mut self, function: Box<dyn Expression>) -> Result<Box<dyn Expression>, String> {
+        let args = self.parse_call_args()?;
+
+        Ok(Box::new(CallExpression {
+            function,
+            args,
+        }))
+    }
+
+    pub fn parse_call_args(&mut self) -> Result<Vec<Box<dyn Expression>>, String> {
+        let mut args = Vec::new();
+
+        if self.peek_token == Token::Rparen {
+            self.next_token();
+
+            return Ok(args);
+        }
+
+        self.next_token();
+
+        let arg = self.parse_expression(Precedence::Lowest)?;
+        args.push(arg);
+
+        while self.peek_token == Token::Comma {
+            self.next_token();
+            self.next_token();
+
+            let arg = self.parse_expression(Precedence::Lowest)?;
+            args.push(arg);
+        }
+
+        if self.peek_token != Token::Rparen {
+            return Err(self.peek_err_msg(Token::Rparen));
+        }
+
+        self.next_token();
+
+        Ok(args)
+    }
+
     pub fn parse_prefix(&mut self) -> Result<Box<dyn Expression>, String> {
         match &self.cur_token {
             Token::Ident(_) => self.parse_identifier(),
@@ -401,6 +442,7 @@ impl<'a> Parser<'a> {
             Token::NotEq |
             Token::LessThen |
             Token::GreaterThen => self.parse_infix_expression(left),
+            Token::Lparen => self.parse_call_expression(left),
             token => {
                 let valid_tokens = "Plus, Minus, Slash, Asterisk, Eq, NotEq, LessThen, GreaterThen";
                 let reference = "See src/token.rs #map_precedence for reference";
@@ -759,6 +801,9 @@ mod test {
             2 / (5 + 5);
             -(5 + 5);
             !(true == true);
+            a + add(b * c) + d;
+            add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8));
+            add(a + b + c * d / f + g);
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -787,7 +832,10 @@ mod test {
             "((5 + 5) * 2);",
             "(2 / (5 + 5));",
             "(-(5 + 5));",
-            "(!(true == true));"
+            "(!(true == true));",
+            "((a + add((b * c))) + d);",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)));",
+            "add((((a + b) + ((c * d) / f)) + g));",
         ].iter().map(|s| s.to_string());
 
         assert_eq!(parser.errors(), &Vec::<String>::new());
@@ -899,6 +947,34 @@ mod test {
             "fn(x) {\nreturn x;\n};",
             "fn(x, y) {\nreturn (x + y);\n};",
         ].iter().map(|s| s.to_string());
+
+        for (index, test) in tests.enumerate() {
+            assert_eq!(program.statements[index].to_string(), test);
+        }
+    }
+
+    #[test]
+    fn test_call_expression() {
+        let input = r#"
+            add();
+            add(1);
+            add(1, 2 * 3);
+            add(1, bar(5), x + 1);
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        let tests = [
+            "add();",
+            "add(1);",
+            "add(1, (2 * 3));",
+            "add(1, bar(5), (x + 1));",
+        ].iter().map(|s| s.to_string());
+
+        assert_eq!(parser.errors, Vec::<String>::new());
 
         for (index, test) in tests.enumerate() {
             assert_eq!(program.statements[index].to_string(), test);

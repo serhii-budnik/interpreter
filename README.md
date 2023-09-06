@@ -1,3 +1,2 @@
-current page: 91
-
-fn expression
+1. update main function.
+2. Chapter 3, page 103

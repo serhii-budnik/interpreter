@@ -76,6 +76,11 @@ pub struct BlockStatement {
     pub statements: Vec<Box<dyn Statement>>,
 }
 
+pub struct CallExpression {
+    pub function: Box<dyn Expression>,
+    pub args: Vec<Box<dyn Expression>>,
+}
+
 #[derive(Debug)]
 pub struct Identifier {
     pub token: Token,
@@ -404,6 +409,38 @@ impl Display for BlockStatement {
             "{{\n{}\n}}",
             self.statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")
         )
+    }
+}
+
+impl Node for CallExpression {
+    fn token(&self) -> Token {
+        Token::Lparen
+    }
+}
+
+impl Display for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}({})",
+            self.function,
+            self.args.iter().map(|arg| arg.to_string()).collect::<Vec<String>>().join(", ")
+        )
+    }
+}
+
+impl Debug for CallExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CallExpression")
+            .field("function", &format_args!("{:#?}", self.function))
+            .field("arguments", &format_args!("{:#?}", self.args))
+            .finish()
+    }
+}
+
+impl Expression for CallExpression {
+    fn expression_node(&self) -> Box<dyn Expression> {
+        todo!()
     }
 }
 

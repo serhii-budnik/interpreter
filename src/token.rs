@@ -75,6 +75,7 @@ impl Token {
             Self::LessThen | Self::GreaterThen => Precedence::LessGreater,
             Self::Plus | Self::Minus => Precedence::Sum,
             Self::Slash | Self::Asterisk => Precedence::Product,
+            Self::Lparen => Precedence::Call,
             _ => Precedence::Lowest,
         }
     }

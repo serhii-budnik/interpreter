@@ -44,8 +44,7 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    #[allow(dead_code)]
-    fn new(mut lexer: Lexer<'a>) -> Parser<'a> {
+    pub fn new(mut lexer: Lexer<'a>) -> Parser<'a> {
         Self {
             cur_token: lexer.next_token(),
             peek_token: lexer.next_token(),
@@ -54,8 +53,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(dead_code)]
-    fn errors(&self) -> &Vec<String> {
+    pub fn errors(&self) -> &Vec<String> {
         &self.errors
     }
 
@@ -89,8 +87,7 @@ impl<'a> Parser<'a> {
         while self.cur_token != Token::Semicolon && self.cur_token != Token::Eof { self.next_token() }
     }
 
-    #[allow(dead_code)]
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut statements = Vec::new();
 
         while self.cur_token != Token::Eof {

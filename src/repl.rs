@@ -1,5 +1,5 @@
 use crate::lexer::Lexer;
-use crate::token::Token;
+use crate::parser::Parser;
 use std::io::Write;
 
 const PROMPT: &'static str = ">> ";
@@ -15,14 +15,21 @@ pub fn start() {
 
         if line == "exit\n" { break }
 
-        let mut lexer = Lexer::new(&line);
+        let lexer = Lexer::new(&line);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
 
-        loop {
-            let token = lexer.next_token();
-            if let Token::Eof = token { break };
+        if !parser.errors().is_empty() {
+            println!("\tparser errors: ");
 
-            print!("{} ", token);
+            for error in parser.errors() {
+                println!("\t\t{}", error);
+            }
+
+            continue;
         }
+
+        println!("{}", program.to_string());
 
         println!("")
     }

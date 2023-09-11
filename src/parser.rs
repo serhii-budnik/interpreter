@@ -65,11 +65,6 @@ impl<'a> Parser<'a> {
        format!("expected next token to be {:?}, got {:?} instead", &token, &self.peek_token)
     }
 
-    fn peek_error(&mut self, token: Token) {
-        let err = self.peek_err_msg(token);
-        self.add_error(err);
-    }
-
     fn cur_precedence(&self) -> Precedence {
         self.cur_token.map_precedence()
     }
@@ -91,9 +86,15 @@ impl<'a> Parser<'a> {
         let mut statements = Vec::new();
 
         while self.cur_token != Token::Eof {
-            let stmt = self.parse_statement();
-
-            if let Some(st) = stmt { statements.push(st) }
+            match self.parse_statement() {
+                Ok(stmt) => {
+                    statements.push(stmt);
+                },
+                Err(err) => {
+                    self.add_error(err);
+                    self.skip_until_semicolon();
+                },
+            };
 
             self.next_token();
         }
@@ -101,67 +102,61 @@ impl<'a> Parser<'a> {
         Program { statements }
     }
 
-    fn parse_statement(&mut self) -> Option<Box<dyn Statement>> {
+    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, String> {
         match self.cur_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
-            Token::Semicolon => None,
             _ => self.parse_expression_statement(),
         }
     }
 
-    fn parse_let_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let identifier = if matches!(self.peek_token, Token::Ident(_)) {
-            self.next_token();
-
-            let token = self.cur_token.take();
-            Identifier { value: token.clone().value(), token }
-        } else {
-            self.peek_error(Token::Ident("<variable_name>".to_string()));
-            self.skip_until_semicolon();
-            return None
-        };
-
-        if let Token::Assign = self.peek_token {
-            self.next_token();
-            self.next_token();
-
-            let value = self.parse_expression(Precedence::Lowest).unwrap();
-
-            Some(Box::new(LetStatement { name: identifier, value }))
-        } else {
-            self.peek_error(Token::Assign);
-            self.skip_until_semicolon();
-            None
+    fn parse_let_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+        if !matches!(self.peek_token, Token::Ident(_)) {
+            return Err(self.peek_err_msg(Token::Ident("<variable_name>".into())));
         }
-    }
-
-    fn parse_return_statement(&mut self) -> Option<Box<dyn Statement>> {
         self.next_token();
 
-        let value = self.parse_expression(Precedence::Lowest).unwrap();
+        let token = self.cur_token.take();
+        let identifier = Identifier { value: token.clone().value(), token };
 
-        Some(Box::new(ReturnStatement { value }))
-    }
-
-    fn parse_expression_statement(&mut self) -> Option<Box<dyn Statement>> {
-        let result = self.parse_expression(Precedence::Lowest);
-
-        if let Err(err) = result {
-            self.add_error(err);
-            self.skip_until_semicolon();
-            return None;
+        if self.peek_token != Token::Assign {
+            return Err(self.peek_err_msg(Token::Assign))
         }
 
-        let expression = result.unwrap();
+        self.next_token();
+        self.next_token();
+
+        let value = self.parse_expression(Precedence::Lowest)?;
+
+        while self.peek_token == Token::Semicolon {
+            self.next_token();
+        }
+
+        Ok(Box::new(LetStatement { name: identifier, value }))
+    }
+
+    fn parse_return_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+        self.next_token();
+
+        let value = self.parse_expression(Precedence::Lowest)?;
+
+        while self.peek_token == Token::Semicolon {
+            self.next_token();
+        }
+
+        Ok(Box::new(ReturnStatement { value }))
+    }
+
+    fn parse_expression_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+        let expression = self.parse_expression(Precedence::Lowest)?;
 
         let stmt = ExpressionStatement { expression };
 
-        if let Token::Semicolon = self.peek_token {
+        while self.peek_token  == Token::Semicolon {
             self.next_token();
         }
 
-        Some(Box::new(stmt))
+        Ok(Box::new(stmt))
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
@@ -308,9 +303,8 @@ impl<'a> Parser<'a> {
         while self.peek_token != Token::Rbrace && self.peek_token != Token::Eof {
             self.next_token();
 
-            if let Some(exp_st) = self.parse_statement() {
-                statements.push(exp_st);
-            }
+            let exp_st = self.parse_statement()?;
+            statements.push(exp_st);
         }
 
         if self.peek_token != Token::Rbrace {
@@ -931,7 +925,7 @@ mod test {
     #[test]
     fn test_fn_expression() {
         let input = r#"
-            fn (x) { return x; }
+            fn (x) { return x }
             fn (x, y) { return x + y; }
         "#.trim();
 
@@ -944,6 +938,8 @@ mod test {
             "fn(x) {\nreturn x;\n};",
             "fn(x, y) {\nreturn (x + y);\n};",
         ].iter().map(|s| s.to_string());
+
+        assert_eq!(parser.errors(), &Vec::<String>::new());
 
         for (index, test) in tests.enumerate() {
             assert_eq!(program.statements[index].to_string(), test);

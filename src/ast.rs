@@ -1,179 +1,178 @@
 use crate::token::Token;
 use std::fmt::{Display, Debug};
 
-pub trait Node: Display + Debug {
-    // this method is needed for debugging
-    fn token(&self) -> Token;
+pub enum Expr {
+    Ident(Token),
+    Int(Token),
+    Bool(Token),
+    Prefix(Token, Box<Expr>),
+    Infix(Box<Expr>, Token, Box<Expr>),
+    If(Box<Expr>, Box<Statement>, Option<Box<Statement>>),
+    Fn(Vec<Box<Expr>>, Statement), // Statement is a Block
+    Call(Box<Expr>, Vec<Box<Expr>>),
 }
 
-pub trait Statement: Node {
-    fn name(&self) -> &Identifier;
-    fn statement_node(&self) -> Box<dyn Statement>;
-}
-
-pub trait Expression: Node {
-    fn expression_node(&self) -> Box<dyn Expression>;
+pub enum Statement {
+    Let(Box<Expr>, Option<Box<Expr>>),
+    Return(Box<Expr>),
+    ExprStatement(Box<Expr>),
+    Block(Vec<Box<Statement>>),
 }
 
 pub struct Program {
-    pub statements: Vec<Box<dyn Statement>>,
+    pub statements: Vec<Box<Statement>>,
 }
 
-pub struct LetStatement {
-    pub name: Identifier,
-    pub value: Box<dyn Expression>,
-}
 
-pub struct ReturnStatement {
-    pub value: Box<dyn Expression>,
-}
-
-pub struct ExpressionStatement {
-    pub expression: Box<dyn Expression>,
-}
-
-#[derive(Debug)]
-pub struct IntegerLiteral {
-    pub token: Token,
-    pub value: i64,
-}
-
-#[derive(Debug)]
-pub struct Boolean {
-    pub token: Token,
-    pub value: bool,
-}
-
-pub struct PrefixExpression {
-    pub token: Token,
-    pub operator: String,
-    pub right: Box<dyn Expression>,
-}
-
-pub struct InfixExpression {
-    pub token: Token,
-    pub operator: String,
-
-    pub left: Box<dyn Expression>,
-    pub right: Box<dyn Expression>,
-}
-
-pub struct IfExpression {
-    pub token: Token,
-    pub condition: Box<dyn Expression>,
-    pub consequence: BlockStatement,
-    pub alternative: Option<BlockStatement>,
-}
-
-#[derive(Debug)]
-pub struct FnExpression { 
-    pub params: Vec<Box<dyn Expression>>,
-    pub body: BlockStatement,
-}
-
-pub struct BlockStatement {
-    pub token: Token,
-    pub statements: Vec<Box<dyn Statement>>,
-}
-
-pub struct CallExpression {
-    pub function: Box<dyn Expression>,
-    pub args: Vec<Box<dyn Expression>>,
-}
-
-#[derive(Debug)]
-pub struct Identifier {
-    pub token: Token,
-    // value just duplicate of token Ident(value). Let's keep it for now, maybe we can delete it later
-    pub value: String,
-}
-
-impl Expression for Identifier {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
+impl Expr {
+    pub fn token(&self) -> Token {
+        match self {
+            Self::Ident(token) => token.clone(),
+            Self::Int(i) => Token::Int(i.to_string()),
+            Self::Bool(t) => t.clone(),
+            Self::Prefix(token, _) => token.clone(),
+            Self::Infix(_, token, _) => token.clone(),
+            Self::If(_, _, _) => Token::If,
+            Self::Fn(_, _) => Token::Function,
+            Self::Call(_, _) => Token::Lparen,
+        }
     }
 }
 
-impl Node for Identifier {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Display for Identifier {
+impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.token)
+        match self {
+            Self::Ident(token) => write!(f, "{}", token),
+            Self::Int(i) => write!(f, "{}", i),
+            Self::Bool(b) => write!(f, "{}", b),
+            Self::Prefix(token, expr) => write!(f, "({}{})", token, expr),
+            Self::Infix(left, token, right) => write!(f, "({} {} {})", left, token, right),
+            Self::If(condition, consequence, alternative) => {
+                if let Some(alternative) = &alternative {
+                    write!(
+                        f,
+                        "if {} {} else {}",
+                        &condition,
+                        &consequence,
+                        &alternative
+                    )
+                } else {
+                    write!(
+                        f,
+                        "if {} {}",
+                        &condition,
+                        &consequence
+                    )
+                }
+            },
+            Self::Fn(params, body) => write!(f, "fn({}) {}", params.iter().map(|param| param.to_string()).collect::<Vec<String>>().join(", "), body),
+            Self::Call(function, args) => write!(f, "{}({})", function, args.iter().map(|arg| arg.to_string()).collect::<Vec<String>>().join(", ")),
+        }
     }
 }
 
-impl Statement for LetStatement {
-    fn name(&self) -> &Identifier {
-        &self.name
-    }
-
-    fn statement_node(&self) -> Box<dyn Statement> {
-        todo!()
-    }
-}
-
-impl Node for LetStatement {
-    fn token(&self) -> Token {
-       Token::Let
-    }
-}
-
-impl Display for LetStatement {
+impl Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} = {};", self.token(), self.name, self.value)
+        match self {
+            Self::Ident(token) => write!(f, "{:?}", token),
+            Self::Int(i) => write!(f, "{:?}", i),
+            Self::Bool(b) => write!(f, "{:?}", b),
+            Self::Prefix(token, expr) => {
+                f.debug_struct("Prefix")
+                    .field("token", &token)
+                    .field("expr", &format_args!("{:#?}", expr))
+                    .finish()
+            },
+            Self::Infix(left, token, right) => {
+                f.debug_struct("InfixExpr")
+                    .field("left", &format_args!("{:#?}", left))
+                    .field("token", &token)
+                    .field("right", &format_args!("{:#?}", right))
+                    .finish()
+            },
+            Self::If(condition, consequence, alternative) => {
+                f.debug_struct("If")
+                    .field("condition", &format_args!("{:#?}", condition))
+                    .field("consequence", &consequence)
+                    .field("alternative", &format_args!("{:#?}", alternative))
+                    .finish()
+            },
+            Self::Fn(params, body) => {
+                f.debug_struct("Fn")
+                    .field("params", &format_args!("{:#?}", params))
+                    .field("body", &body)
+                    .finish()
+            },
+            Self::Call(function, args) => {
+                f.debug_struct("Call")
+                    .field("function", &format_args!("{:#?}", function))
+                    .field("args", &args)
+                    .finish()
+            },
+        }
     }
 }
 
-impl Debug for LetStatement {
+impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LetStatement")
-            .field("name", &format_args!("{:#?}", self.name))
-            .field("value", &format_args!("{:#?}", self.value))
-            .finish()
+        match self {
+            Self::Let(name, value) => {
+                if let Some(value) = value {
+                    write!(f, "{} {} = {};", self.token(), name, value)
+                } else {
+                    write!(f, "{} {};", self.token(), name)
+                }
+            },
+            Self::Return(value) => write!(f, "{} {};", self.token(), value),
+            Self::ExprStatement(expr) => write!(f, "{};", expr),
+            Self::Block(statements) => write!(f, "{{\n{}\n}}", statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")),
+        }
     }
 }
 
-impl Statement for ReturnStatement {
-    fn name(&self) -> &Identifier {
-        todo!()
+impl Statement {
+    pub fn token(&self) -> Token {
+        match self {
+            Self::Let(_, _) => Token::Let,
+            Self::Return(_) => Token::Return,
+            Self::ExprStatement(t) => t.token(),
+            Self::Block(_) => Token::Lbrace,
+        }
     }
 
-    fn statement_node(&self) -> Box<dyn Statement> {
-        todo!()
+    pub fn name(&self) -> &Box<Expr> {
+        match self {
+            Self::Let(ident, _) => ident,
+            _ => todo!(),
+        }
     }
 }
 
-impl Node for ReturnStatement {
-    fn token(&self) -> Token {
-        Token::Return
-    }
-}
-
-impl Display for ReturnStatement {
+impl Debug for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {};", self.token(), self.value)
-    }
-}
-
-
-impl Debug for ReturnStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ReturnStatement")
-            .field("value", &format_args!("{:#?}", self.value))
-            .finish()
-    }
-}
-
-impl Node for Program {
-    fn token(&self) -> Token {
-        if self.statements.len() > 0 {
-            return self.statements[0].token();
-        } else {
-            return Token::Eof;
+        match self {
+            Self::Let(name, value) => {
+                f.debug_struct("LetStatement")
+                    .field("name", &format_args!("{:#?}", name))
+                    .field("value", &format_args!("{:#?}", value))
+                    .finish()
+            },
+            Self::Return(value) => {
+                f.debug_struct("ReturnStatement")
+                    .field("value", &format_args!("{:#?}", value))
+                    .finish()
+            },
+            Self::ExprStatement(expr) => {
+                f.debug_struct("ExprStatement")
+                    .field("expression", &format_args!("{:#?}", expr))
+                    .finish()
+            },
+            Self::Block(statements) => {
+                f.debug_struct("BlockStatement")
+                    .field("token", &self.token())
+                    .field("statements", &format_args!("{:#?}", statements))
+                    .finish()
+            },
         }
     }
 }
@@ -199,287 +198,29 @@ impl Debug for Program {
     }
 }
 
-impl Node for ExpressionStatement {
-    fn token(&self) -> Token {
-        self.expression.token()
-    }
-}
-
-impl Statement for ExpressionStatement {
-    fn name(&self) -> &Identifier {
-        todo!()
-    }
-
-    fn statement_node(&self) -> Box<dyn Statement> {
-        todo!()
-    }
-}
-
-impl Display for ExpressionStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{};", self.expression)
-    }
-}
-
-impl Debug for ExpressionStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ExpressionStatement")
-            .field("expression", &format_args!("{:#?}", self.expression))
-            .finish()
-    }
-}
-
-impl Node for IntegerLiteral {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Expression for IntegerLiteral {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
-
-impl Display for IntegerLiteral {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
-    }
-}
-
-impl Node for Boolean {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Expression for Boolean {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
-
-impl Display for Boolean {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.token)
-    }
-}
-
-impl Node for PrefixExpression {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Expression for PrefixExpression {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
-
-impl Display for PrefixExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}{})", self.token.to_string(), self.right)
-    }
-}
-
-impl Debug for PrefixExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PrefixExpression")
-            .field("token", &self.token)
-            .field("operator", &self.operator)
-            .field("right", &self.right)
-            .finish()
-    }
-}
-
-impl Node for InfixExpression {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Expression for InfixExpression {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
-
-impl Display for InfixExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} {} {})", self.left, self.token.to_string(), self.right)
-    }
-}
-
-impl Debug for InfixExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("InfixExpression")
-            .field("token", &self.token)
-            .field("operator", &self.operator)
-            .field("left", &format_args!("{:#?}", self.left))
-            .field("right", &format_args!("{:#?}", self.right))
-            .finish()
-    }
-}
-
-impl Node for IfExpression {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Expression for IfExpression {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
-
-impl Debug for IfExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IfExpression")
-            .field("token", &self.token)
-            .field("condition", &format_args!("{:#?}", self.condition))
-            .finish()
-    }
-}
-
-impl Display for IfExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(alternative) = &self.alternative {
-            write!(
-                f,
-                "if {} {} else {}",
-                &self.condition,
-                &self.consequence,
-                &alternative
-            )
-        } else {
-            write!(
-                f,
-                "if {} {}",
-                &self.condition,
-                &self.consequence
-            )
-        }
-    }
-}
-
-impl Node for FnExpression {
-    fn token(&self) -> Token {
-        Token::Function
-    }
-}
-
-impl Display for FnExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "fn({}) {}",
-            self.params.iter().map(|param| param.to_string()).collect::<Vec<String>>().join(", "),
-            self.body
-        )
-    }
-}
-
-impl Expression for FnExpression {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
-
-impl Node for BlockStatement {
-    fn token(&self) -> Token {
-        self.token.clone()
-    }
-}
-
-impl Debug for BlockStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BlockStatement")
-            .field("token", &self.token)
-            .field("statements", &format_args!("{:#?}", self.statements))
-            .finish()
-    }
-}
-
-impl Display for BlockStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{{\n{}\n}}",
-            self.statements.iter().map(|statement| statement.to_string()).collect::<Vec<String>>().join("\n")
-        )
-    }
-}
-
-impl Node for CallExpression {
-    fn token(&self) -> Token {
-        Token::Lparen
-    }
-}
-
-impl Display for CallExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}({})",
-            self.function,
-            self.args.iter().map(|arg| arg.to_string()).collect::<Vec<String>>().join(", ")
-        )
-    }
-}
-
-impl Debug for CallExpression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CallExpression")
-            .field("function", &format_args!("{:#?}", self.function))
-            .field("arguments", &format_args!("{:#?}", self.args))
-            .finish()
-    }
-}
-
-impl Expression for CallExpression {
-    fn expression_node(&self) -> Box<dyn Expression> {
-        todo!()
-    }
-}
 
 #[cfg(test)]
 mod test {
     use crate::token::Token;
     use super::{
-        ExpressionStatement,
-        FnExpression,
-        Identifier,
-        InfixExpression,
-        IntegerLiteral,
-        LetStatement,
-        PrefixExpression,
         Program,
-        ReturnStatement,
-        BlockStatement,
+        Statement,
+        Expr,
     };
 
     #[test]
     fn to_string_converts_let_statement_to_readable_code() {
         let program = Program {
             statements: vec![
-                Box::new(LetStatement {
-                    name: Identifier {
-                        token: Token::Ident("myVar".to_string()),
-                        value: "myVar".to_string(),
-                    },
-                    value: Box::new(Identifier {
-                        token: Token::Ident("anotherVar".to_string()),
-                        value: "anotherVar".to_string(),
-                    }),
-                }),
-                Box::new(ReturnStatement {
-                    value: Box::new(Identifier {
-                        token: Token::Ident("myVar".to_string()),
-                        value: "myVar".to_string(),
-                    }),
-                }),
+                Box::new(Statement::Let(
+                    Box::new(Expr::Ident(Token::Ident("myVar".to_string()))),
+                    Some(Box::new(Expr::Ident(
+                        Token::Ident("anotherVar".to_string()),
+                    ))),
+                )),
+                Box::new(Statement::Return(
+                    Box::new(Expr::Ident(Token::Ident("myVar".to_string()))),
+                )),
             ],
         };
 
@@ -490,26 +231,22 @@ mod test {
     fn to_string_converts_prefix_expression_to_readable_code() {
         let program = Program {
             statements: vec![
-                Box::new(ExpressionStatement { 
-                    expression: Box::new(PrefixExpression {
-                        token: Token::Bang,
-                        operator: "!".to_string(),
-                        right: Box::new(Identifier {
-                            token: Token::Ident("myVar".to_string()),
-                            value: "myVar".to_string(),
-                        }),
-                    }),
-                }),
-                Box::new(ExpressionStatement { 
-                    expression: Box::new(PrefixExpression {
-                        token: Token::Minus,
-                        operator: "-".to_string(),
-                        right: Box::new(IntegerLiteral {
-                            token: Token::Int("4".to_string()),
-                            value: 4,
-                        }),
-                    }),
-                }),
+                Box::new(Statement::ExprStatement(
+                    Box::new(Expr::Prefix(
+                        Token::Bang,
+                        Box::new(Expr::Ident (
+                            Token::Ident("myVar".to_string()),
+                        )),
+                    )),
+                )),
+                Box::new(Statement::ExprStatement(
+                    Box::new(Expr::Prefix(
+                        Token::Minus,
+                        Box::new(Expr::Int(
+                            Token::Int("4".to_string()),
+                        )),
+                    )),
+                )),
             ]
         };
 
@@ -520,20 +257,17 @@ mod test {
     fn to_string_converts_infix_expression_to_readable_code() {
         let program = Program {
             statements: vec![
-                Box::new(ExpressionStatement {
-                    expression: Box::new(InfixExpression {
-                        token: Token::Plus,
-                        operator: "+".to_string(),
-                        left: Box::new(IntegerLiteral {
-                            token: Token::Int("4".to_string()),
-                            value: 4,
-                        }),
-                        right: Box::new(Identifier {
-                            token: Token::Int("x".to_string()),
-                            value: "x".to_string(),
-                        }),
-                    }),
-                })
+                Box::new(Statement::ExprStatement(
+                    Box::new(Expr::Infix(
+                        Box::new(Expr::Int(
+                            Token::Int("4".to_string()),
+                        )),
+                        Token::Plus,
+                        Box::new(Expr::Ident(
+                            Token::Int("x".to_string()),
+                        )),
+                    )),
+                )),
             ]
         };
 
@@ -542,37 +276,31 @@ mod test {
 
     #[test]
     fn to_string_converts_fn_expression_to_readable_code() {
-        let program = FnExpression {
-            params: vec![
-                Box::new(Identifier {
-                    token: Token::Ident("x".to_string()),
-                    value: "x".to_string(),
-                }),
-                Box::new(Identifier {
-                    token: Token::Ident("y".to_string()),
-                    value: "y".to_string(),
-                }),
+        let program = Expr::Fn(
+            vec![
+                Box::new(Expr::Ident(
+                    Token::Ident("x".to_string()),
+                )),
+                Box::new(Expr::Ident(
+                    Token::Ident("y".to_string()),
+                )),
             ],
-            body: BlockStatement {
-                token: Token::Lbrace,
-                statements: vec![
-                    Box::new(ExpressionStatement {
-                        expression: Box::new(InfixExpression {
-                            token: Token::Plus,
-                            operator: "+".to_string(),
-                            left: Box::new(Identifier {
-                                token: Token::Ident("x".to_string()),
-                                value: "x".to_string(),
-                            }),
-                            right: Box::new(Identifier {
-                                token: Token::Ident("y".to_string()),
-                                value: "y".to_string(),
-                            }),
-                        }),
-                    }),
+            Statement::Block(
+                vec![
+                    Box::new(Statement::ExprStatement(
+                        Box::new(Expr::Infix(
+                            Box::new(Expr::Ident(
+                                Token::Ident("x".to_string()),
+                            )),
+                            Token::Plus,
+                            Box::new(Expr::Ident(
+                                Token::Ident("y".to_string()),
+                            )),
+                        )),
+                    )),
                 ],
-            },
-        };
+            ),
+        );
 
         assert_eq!(program.to_string(), "fn(x, y) {\n(x + y);\n}");
     }

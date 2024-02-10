@@ -3,7 +3,7 @@ use std::{fmt::Display, mem};
 use crate::parser::Precedence;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token { 
+pub enum Token {
     Illegal,
     Eof,
 
@@ -85,7 +85,7 @@ impl Token {
     }
 
     pub fn value(self) -> String {
-        match self { 
+        match self {
             Self::Ident(s) | Self::Int(s) => s,
             _ => panic!("Token::value() called on non-value token"),
         }

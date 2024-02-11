@@ -84,7 +84,7 @@ impl Token {
         mem::take(self)
     }
 
-    pub fn value(self) -> String {
+    pub fn value(&self) -> &String {
         match self {
             Self::Ident(s) | Self::Int(s) => s,
             _ => panic!("Token::value() called on non-value token"),

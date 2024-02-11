@@ -5,11 +5,15 @@ pub enum ObjectType {
     Null,
 }
 
+pub const FALSE_OBJ: ObjectType = ObjectType::Bool(false);
+pub const NULL_OBJ: ObjectType = ObjectType::Null;
+pub const TRUE_OBJ: ObjectType = ObjectType::Bool(true);
+
 impl From<Option<ObjectType>> for ObjectType {
     fn from(value: Option<ObjectType>) -> Self {
         match value {
             Some(o) => o,
-            None => ObjectType::Null,
+            None => NULL_OBJ,
         }
     }
 }

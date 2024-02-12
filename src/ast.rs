@@ -1,6 +1,10 @@
 use crate::token::Token;
 use std::fmt::{Display, Debug};
 
+pub trait ChildrenStatements {
+    fn children(self) -> Vec<Box<Statement>>;
+}
+
 pub enum Expr {
     Ident(Token),
     Int(Token),
@@ -20,9 +24,20 @@ pub enum Statement {
 }
 
 pub struct Program {
-    pub statements: Vec<Box<Statement>>,
+    statements: Vec<Box<Statement>>,
 }
 
+impl Program {
+    pub fn new(statements: Vec<Box<Statement>>) -> Program {
+        Self { statements }
+    }
+}
+
+impl ChildrenStatements for Program {
+   fn children(self) -> Vec<Box<Statement>> {
+        self.statements
+    }
+}
 
 impl Expr {
     pub fn token(&self) -> Token {
@@ -144,6 +159,15 @@ impl Statement {
         match self {
             Self::Let(ident, _) => ident,
             _ => todo!(),
+        }
+    }
+}
+
+impl ChildrenStatements for Statement {
+   fn children(self) -> Vec<Box<Statement>> {
+        match self {
+            Self::Block(statements) => statements,
+            s => panic!("not implemented for {}", s),
         }
     }
 }

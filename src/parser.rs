@@ -83,7 +83,7 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        Program { statements }
+        Program::new(statements)
     }
 
     fn parse_statement(&mut self) -> Result<Box<Statement>, String> {

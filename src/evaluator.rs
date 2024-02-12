@@ -1,13 +1,13 @@
-use crate::ast::{Expr, Program, Statement};
+use crate::ast::{Expr, Program, Statement, ChildrenStatements};
 use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
 
 pub trait Evaluator {
-    fn eval(&self) -> ObjectType;
+    fn eval(self) -> ObjectType;
 }
 
 impl Evaluator for Expr {
-    fn eval(&self) -> ObjectType {
+    fn eval(self) -> ObjectType {
         match self {
             Self::Int(token) => {
                 let int_val: isize = token.value().parse().unwrap();
@@ -29,7 +29,7 @@ impl Evaluator for Expr {
                     Token::Minus => {
                         match right.eval() {
                             ObjectType::Int(val) => ObjectType::Int(-val),
-                            _ => panic!("expected Expr::Int, got {:?}", right),
+                            obj => panic!("expected Expr::Int, got {:?}", obj),
                         }
                     }
                     _ => panic!("eval for prefix operator not implemented"),
@@ -37,7 +37,8 @@ impl Evaluator for Expr {
             },
             Self::Infix(left, op, right) => {
                 match op {
-                    Token::Plus | Token::Minus | Token::Asterisk | Token::Slash => {
+                    Token::Plus | Token::Minus | Token::Asterisk | Token::Slash | Token::LessThen |
+                    Token::GreaterThen => {
                         let left_val = left.eval();
                         let right_val = right.eval();
 
@@ -48,6 +49,8 @@ impl Evaluator for Expr {
                                     Token::Minus => ObjectType::Int(l - r),
                                     Token::Asterisk => ObjectType::Int(l * r),
                                     Token::Slash => ObjectType::Int(l / r),
+                                    Token::LessThen => ObjectType::Bool(l < r),
+                                    Token::GreaterThen => ObjectType::Bool(l > r),
                                     _ => panic!("expected infix operator, got {:?}", op),
                                 }
                             },
@@ -79,32 +82,48 @@ impl Evaluator for Expr {
                     _ => panic!("eval for infix operator not implemented"),
                 }
             },
+            Self::If(condition, consequence, alternative) => {
+                if condition.eval().is_truthy() {
+                    return consequence.eval()
+                } else {
+                    if let Some(alt) = alternative {
+                        return alt.eval();
+                    }
+
+                    NULL_OBJ
+                }
+            },
             _ => NULL_OBJ,
         }
     }
 }
 
 impl Evaluator for Statement {
-    fn eval(&self) -> ObjectType {
+    fn eval(self) -> ObjectType {
         match self {
             Statement::ExprStatement(expr) => expr.eval(),
-            _ => todo!(),
+            Statement::Block(stmts) => eval_statements(stmts),
+            _ => panic!("given Statement {} is not implemented yet", self),
         }
     }
 }
 
 impl Evaluator for Program {
-    fn eval(&self) -> ObjectType {
-        let mut result = NULL_OBJ;
-
-        for stmt in &self.statements {
-            result = stmt.eval();
-        }
-
-        result
+    fn eval(self) -> ObjectType {
+        eval_statements(self.children())
     }
 }
 
+fn eval_statements(statements: Vec<Box<Statement>>) -> ObjectType
+{
+    let mut result = NULL_OBJ;
+
+    for stmt in statements {
+        result = stmt.eval();
+    }
+
+    result
+}
 
 #[cfg(test)]
 mod test {
@@ -211,6 +230,16 @@ mod test {
             Token::NotEq,
             Box::new(Expr::Int(Token::Int("5".into()))),
         ).eval();
+        let five_less_then_six = Expr::Infix(
+            Box::new(Expr::Int(Token::Int("5".into()))),
+            Token::LessThen,
+            Box::new(Expr::Int(Token::Int("6".into()))),
+        ).eval();
+        let five_greater_then_six = Expr::Infix(
+            Box::new(Expr::Int(Token::Int("5".into()))),
+            Token::GreaterThen,
+            Box::new(Expr::Int(Token::Int("6".into()))),
+        ).eval();
 
         assert_eq!(five_plus_five, ObjectType::Int(10));
         assert_eq!(five_minus_five, ObjectType::Int(0));
@@ -220,5 +249,7 @@ mod test {
         assert_eq!(five_eq_six, FALSE_OBJ);
         assert_eq!(five_neq_six, TRUE_OBJ);
         assert_eq!(five_neq_five, FALSE_OBJ);
+        assert_eq!(five_less_then_six, TRUE_OBJ);
+        assert_eq!(five_greater_then_six, FALSE_OBJ);
     }
 }

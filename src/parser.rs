@@ -430,7 +430,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-        assert_eq!(program.statements.len(), 3);
+        assert_eq!(program.statements().len(), 3);
 
         let tests = [
             Statement::Let(
@@ -448,7 +448,7 @@ mod test {
         ];
 
         for (index, test) in tests.iter().enumerate() {
-            assert_eq!(test_let_statement(test, &program.statements[index]), true)
+            assert_eq!(test_let_statement(test, &program.statements()[index]), true)
         }
     }
 
@@ -467,7 +467,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-        assert_eq!(program.statements.len(), 4);
+        assert_eq!(program.statements().len(), 4);
 
         let tests = [
             Statement::Return(
@@ -489,7 +489,7 @@ mod test {
         ];
 
         for (index, test) in tests.iter().enumerate() {
-            assert_eq!(test.to_string(), program.statements[index].to_string());
+            assert_eq!(test.to_string(), program.statements()[index].to_string());
         }
     }
 
@@ -504,9 +504,9 @@ mod test {
 
         assert_eq!(parser.errors.is_empty(), true);
 
-        assert_eq!(program.statements.len(), 1);
-        assert_eq!(program.statements[0].token(), Token::Ident("foobar".to_string()));
-        assert_eq!(program.statements[0].to_string(), "foobar;");
+        assert_eq!(program.statements().len(), 1);
+        assert_eq!(program.statements()[0].token(), Token::Ident("foobar".to_string()));
+        assert_eq!(program.statements()[0].to_string(), "foobar;");
     }
 
     #[test]
@@ -520,9 +520,9 @@ mod test {
 
         assert_eq!(parser.errors.is_empty(), true);
 
-        assert_eq!(program.statements.len(), 1);
-        assert_eq!(program.statements[0].token(), Token::Int("5".to_string()));
-        assert_eq!(program.statements[0].to_string(), "5;");
+        assert_eq!(program.statements().len(), 1);
+        assert_eq!(program.statements()[0].token(), Token::Int("5".to_string()));
+        assert_eq!(program.statements()[0].to_string(), "5;");
     }
 
     #[test]
@@ -578,7 +578,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-        assert_eq!(program.statements.len(), 4);
+        assert_eq!(program.statements().len(), 4);
 
         let tests = [
             Statement::ExprStatement(
@@ -608,8 +608,8 @@ mod test {
         ];
 
         for (index, test) in tests.iter().enumerate() {
-            assert_eq!(test.token(), program.statements[index].token());
-            assert_eq!(test.to_string(), program.statements[index].to_string());
+            assert_eq!(test.token(), program.statements()[index].token());
+            assert_eq!(test.to_string(), program.statements()[index].to_string());
         }
     }
 
@@ -632,7 +632,7 @@ mod test {
         let program = parser.parse_program();
 
         assert_eq!(parser.errors().is_empty(), true);
-        assert_eq!(program.statements.len(), 8);
+        assert_eq!(program.statements().len(), 8);
 
         let tests = [
             Statement::ExprStatement(
@@ -694,8 +694,8 @@ mod test {
         ];
 
         for (index, test) in tests.iter().enumerate() {
-            assert_eq!(test.token(), program.statements[index].token());
-            assert_eq!(test.to_string(), program.statements[index].to_string());
+            assert_eq!(test.token(), program.statements()[index].token());
+            assert_eq!(test.to_string(), program.statements()[index].to_string());
         }
     }
 
@@ -763,7 +763,7 @@ mod test {
         assert_eq!(parser.errors(), &Vec::<String>::new());
 
         for (index, test) in tests.enumerate() {
-            assert_eq!(program.statements[index].to_string(), test);
+            assert_eq!(program.statements()[index].to_string(), test);
         }
     }
 
@@ -785,7 +785,7 @@ mod test {
         ].iter().map(|s| s.to_string());
 
         for (index, test) in tests.enumerate() {
-            assert_eq!(program.statements[index].to_string(), test);
+            assert_eq!(program.statements()[index].to_string(), test);
         }
     }
 
@@ -829,7 +829,7 @@ mod test {
         ].iter().map(|s| s.to_string());
 
         for (index, test) in tests.enumerate() {
-            assert_eq!(program.statements[index].to_string(), test);
+            assert_eq!(program.statements()[index].to_string(), test);
         }
     }
 
@@ -873,7 +873,7 @@ mod test {
         assert_eq!(parser.errors(), &Vec::<String>::new());
 
         for (index, test) in tests.enumerate() {
-            assert_eq!(program.statements[index].to_string(), test);
+            assert_eq!(program.statements()[index].to_string(), test);
         }
     }
 
@@ -901,7 +901,7 @@ mod test {
         assert_eq!(parser.errors, Vec::<String>::new());
 
         for (index, test) in tests.enumerate() {
-            assert_eq!(program.statements[index].to_string(), test);
+            assert_eq!(program.statements()[index].to_string(), test);
         }
     }
 }

@@ -31,6 +31,10 @@ impl Program {
     pub fn new(statements: Vec<Box<Statement>>) -> Program {
         Self { statements }
     }
+
+    pub fn statements(&self) -> &Vec<Box<Statement>> {
+        &self.statements
+    }
 }
 
 impl ChildrenStatements for Program {

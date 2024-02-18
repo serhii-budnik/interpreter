@@ -131,6 +131,8 @@ mod test {
     use crate::object::{ObjectType, TRUE_OBJ, FALSE_OBJ};
     use crate::token::Token;
     use crate::ast::{Expr, Statement};
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
 
     #[test]
     fn test_eval_integer_expression() {
@@ -160,96 +162,75 @@ mod test {
 
     #[test]
     fn test_bang_operator() {
-        let not_true = Expr::Prefix(Token::Bang, Box::new(Expr::Bool(Token::True))).eval();
-        let not_false = Expr::Prefix(Token::Bang, Box::new(Expr::Bool(Token::False))).eval();
-        let not_six = Expr::Prefix(Token::Bang, Box::new(Expr::Int(Token::Int("6".into())))).eval();
-        let not_zero = Expr::Prefix(Token::Bang, Box::new(Expr::Int(Token::Int("0".into())))).eval();
-        let not_one = Expr::Prefix(Token::Bang, Box::new(Expr::Int(Token::Int("1".into())))).eval();
+        let examples = [
+            ("!true", FALSE_OBJ),
+            ("!false", TRUE_OBJ),
+            ("!6", FALSE_OBJ),
+            ("!0", FALSE_OBJ),
+            ("!1", FALSE_OBJ),
+        ];
 
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval();
 
-        assert_eq!(not_true, FALSE_OBJ);
-        assert_eq!(not_false, TRUE_OBJ);
-        assert_eq!(not_six, FALSE_OBJ);
-        assert_eq!(not_zero, FALSE_OBJ);
-        assert_eq!(not_one, FALSE_OBJ);
+            assert_eq!(result, *expected);
+        }
     }
 
     #[test]
     fn test_minus_prefix_operator() {
-        let minus_five = Expr::Prefix(Token::Minus, Box::new(Expr::Int(Token::Int("5".into())))).eval();
-        let minus_ten = Expr::Prefix(Token::Minus, Box::new(Expr::Int(Token::Int("10".into())))).eval();
-        let minus_minus_five = Expr::Prefix(
-            Token::Minus,
-            Box::new(Expr::Prefix(Token::Minus, Box::new(Expr::Int(Token::Int("5".into()))))),
-        ).eval();
+        let examples = [
+            ("5", ObjectType::Int(5)),
+            ("-5", ObjectType::Int(-5)),
+            ("-10", ObjectType::Int(-10)),
+            ("--5", ObjectType::Int(5)),
+        ];
 
-        assert_eq!(minus_five, ObjectType::Int(-5));
-        assert_eq!(minus_ten, ObjectType::Int(-10));
-        assert_eq!(minus_minus_five, ObjectType::Int(5));
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+
+            assert_eq!(result, *expected);
+        }
     }
 
     #[test]
     fn test_infix_operator() {
-        let five_plus_five = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::Plus,
-            Box::new(Expr::Int(Token::Int("5".into()))),
-        ).eval();
-        let five_minus_five = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::Minus,
-            Box::new(Expr::Int(Token::Int("5".into()))),
-        ).eval();
-        let five_times_five = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::Asterisk,
-            Box::new(Expr::Int(Token::Int("5".into()))),
-        ).eval();
-        let five_divided_by_five = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::Slash,
-            Box::new(Expr::Int(Token::Int("5".into()))),
-        ).eval();
-        let five_eq_five = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::Eq,
-            Box::new(Expr::Int(Token::Int("5".into()))),
-        ).eval();
-        let five_eq_six = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::Eq,
-            Box::new(Expr::Int(Token::Int("6".into()))),
-        ).eval();
-        let five_neq_six = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::NotEq,
-            Box::new(Expr::Int(Token::Int("6".into()))),
-        ).eval();
-        let five_neq_five = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::NotEq,
-            Box::new(Expr::Int(Token::Int("5".into()))),
-        ).eval();
-        let five_less_then_six = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::LessThen,
-            Box::new(Expr::Int(Token::Int("6".into()))),
-        ).eval();
-        let five_greater_then_six = Expr::Infix(
-            Box::new(Expr::Int(Token::Int("5".into()))),
-            Token::GreaterThen,
-            Box::new(Expr::Int(Token::Int("6".into()))),
-        ).eval();
+        let examples = [
+            ("5 + 5", ObjectType::Int(10)),
+            ("5 - 5", ObjectType::Int(0)),
+            ("5 * 5", ObjectType::Int(25)),
+            ("5 / 5", ObjectType::Int(1)),
+            ("5 == 5", TRUE_OBJ),
+            ("5 == 6", FALSE_OBJ),
+            ("5 != 6", TRUE_OBJ),
+            ("5 != 5", FALSE_OBJ),
+            ("5 > 6", FALSE_OBJ),
+            ("5 < 6", TRUE_OBJ),
+        ];
 
-        assert_eq!(five_plus_five, ObjectType::Int(10));
-        assert_eq!(five_minus_five, ObjectType::Int(0));
-        assert_eq!(five_times_five, ObjectType::Int(25));
-        assert_eq!(five_divided_by_five, ObjectType::Int(1));
-        assert_eq!(five_eq_five, TRUE_OBJ);
-        assert_eq!(five_eq_six, FALSE_OBJ);
-        assert_eq!(five_neq_six, TRUE_OBJ);
-        assert_eq!(five_neq_five, FALSE_OBJ);
-        assert_eq!(five_less_then_six, TRUE_OBJ);
-        assert_eq!(five_greater_then_six, FALSE_OBJ);
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+
+            assert_eq!(result, *expected);
+        }
+    }
+
+    #[test]
+    fn test_if_statements() {
+        let examples = [
+            ("if (true) { 10 }", ObjectType::Int(10)),
+            ("if (false) { 10 }", ObjectType::Null),
+            ("if (1) { 10 }", ObjectType::Int(10)),
+            ("if (1 < 2) { 10 }", ObjectType::Int(10)),
+            ("if (1 > 2) { 10 }", ObjectType::Null),
+            ("if (1 > 2) { 10 } else { 20 }", ObjectType::Int(20)),
+            ("if (1 < 2) { 10 } else { 20 }", ObjectType::Int(10)),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+
+            assert_eq!(result, *expected);
+        }
     }
 }

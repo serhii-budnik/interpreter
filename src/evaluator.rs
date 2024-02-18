@@ -29,10 +29,11 @@ impl Evaluator for Expr {
                     Token::Minus => {
                         match right.eval() {
                             ObjectType::Int(val) => ObjectType::Int(-val),
+                            ObjectType::Bool(_) => ObjectType::new_error("unknown operator: -BOOLEAN".to_string()),
                             obj => panic!("expected Expr::Int, got {:?}", obj),
                         }
                     }
-                    _ => panic!("eval for prefix operator not implemented"),
+                    op => panic!("eval for prefix operator not implemented {}", op),
                 }
             },
             Self::Infix(left, op, right) => {
@@ -54,7 +55,9 @@ impl Evaluator for Expr {
                                     _ => panic!("expected infix operator, got {:?}", op),
                                 }
                             },
-                            (l, _) => panic!("expected Expr::Int, got {:?}", l),
+                            (l, r) => ObjectType::new_error(
+                                format!("unknown operator: {} {} {}", l.type_name(), op, r.type_name())
+                            ),
                         }
                     },
                     Token::Eq | Token::NotEq => {
@@ -76,15 +79,23 @@ impl Evaluator for Expr {
                                     _ => panic!("expected infix operator, got {:?}", op),
                                 }
                             },
-                            (l, _) => panic!("expected Expr::Int or Expr::Bool for left and right nodes, got {:?}", l),
+                            (l, r) => ObjectType::new_error(
+                                format!("type mismatch: {} {} {}", l.type_name(), op, r.type_name())
+                            ),
                         }
                     },
-                    _ => panic!("eval for infix operator not implemented"),
+                    op => panic!("eval for infix operator ({}) not implemented", op),
                 }
             },
             Self::If(condition, consequence, alternative) => {
-                if condition.eval().is_truthy() {
-                    return consequence.eval()
+                let cond_value = condition.eval();
+
+                if let ObjectType::Error(_) = cond_value {
+                    return cond_value;
+                }
+
+                if cond_value.is_truthy() {
+                    consequence.eval()
                 } else {
                     if let Some(alt) = alternative {
                         return alt.eval();
@@ -93,7 +104,7 @@ impl Evaluator for Expr {
                     NULL_OBJ
                 }
             },
-            _ => NULL_OBJ,
+            expr => ObjectType::new_error(format!("eval is not impemented for {}", expr)),
         }
     }
 }
@@ -120,6 +131,10 @@ fn eval_statements(statements: Vec<Box<Statement>>) -> ObjectType
 
     for stmt in statements {
         result = stmt.eval();
+
+        if let ObjectType::Error(_) = result {
+            return result;
+        }
     }
 
     result
@@ -231,6 +246,25 @@ mod test {
             let result = Parser::new(Lexer::new(input)).parse_program().eval();
 
             assert_eq!(result, *expected);
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let examples = [
+            ("5 + true", "unknown operator: INTEGER + BOOLEAN"),
+            ("5 + true; 5", "unknown operator: INTEGER + BOOLEAN"),
+            ("-true", "unknown operator: -BOOLEAN"),
+            ("true + false", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("5; false + true; 5", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("if (-false) { 1 } else { 2 };", "unknown operator: -BOOLEAN"),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+
+            assert_eq!(result, ObjectType::Error(expected.to_string()));
         }
     }
 }

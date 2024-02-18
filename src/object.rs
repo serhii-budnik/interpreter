@@ -3,6 +3,7 @@ pub enum ObjectType {
     Int(isize),
     Bool(bool),
     Null,
+    Error(String),
 }
 
 pub const FALSE_OBJ: ObjectType = ObjectType::Bool(false);
@@ -24,6 +25,7 @@ impl std::fmt::Display for ObjectType {
             Self::Int(value) => write!(f, "{}", value),
             Self::Bool(value) => write!(f, "{}", value),
             Self::Null => write!(f, "null"),
+            Self::Error(str) => write!(f, "Error: {}", str),
         }
     }
 }
@@ -33,7 +35,21 @@ impl ObjectType {
         match self {
             Self::Bool(boolean) => *boolean,
             Self::Null => false,
+            Self::Error(_) => panic!("Can not convert Error object to truthy"),
             _ => true,
+        }
+    }
+
+    pub fn new_error(msg: String) -> ObjectType {
+        ObjectType::Error(msg)
+    }
+
+    pub fn type_name(&self) -> &str {
+        match self {
+            Self::Int(_) => "INTEGER",
+            Self::Bool(_) => "BOOLEAN",
+            Self::Null => "NULL",
+            Self::Error(_) => "ERROR",
         }
     }
 }

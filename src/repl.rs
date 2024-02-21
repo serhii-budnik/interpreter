@@ -2,10 +2,13 @@ use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io::Write;
 use crate::evaluator::Evaluator;
+use crate::environment::Environment;
 
 const PROMPT: &'static str = ">> ";
 
 pub fn start() {
+    let mut env = Environment::new();
+
     loop {
         let mut line = String::new();
 
@@ -30,7 +33,7 @@ pub fn start() {
             continue;
         }
 
-        let evaluated = program.eval();
+        let evaluated = program.eval(&mut env);
         println!("{}", evaluated);
 
         println!("")

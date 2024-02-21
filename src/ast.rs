@@ -44,6 +44,7 @@ impl ChildrenStatements for Program {
 }
 
 impl Expr {
+    // usually use it for debugging purposes
     pub fn token(&self) -> Token {
         match self {
             Self::Ident(token) => token.clone(),
@@ -150,6 +151,7 @@ impl Display for Statement {
 }
 
 impl Statement {
+    // usually use it for debugging purposes
     pub fn token(&self) -> Token {
         match self {
             Self::Let(_, _) => Token::Let,

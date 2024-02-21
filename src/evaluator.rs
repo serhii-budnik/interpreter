@@ -1,13 +1,14 @@
 use crate::ast::{Expr, Program, Statement, ChildrenStatements};
+use crate::environment::Environment;
 use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
 
 pub trait Evaluator {
-    fn eval(self) -> ObjectType;
+    fn eval(self, environment: &mut Environment) -> ObjectType;
 }
 
 impl Evaluator for Expr {
-    fn eval(self) -> ObjectType {
+    fn eval(self, environment: &mut Environment) -> ObjectType {
         match self {
             Self::Int(token) => {
                 let int_val: isize = token.value().parse().unwrap();
@@ -24,10 +25,10 @@ impl Evaluator for Expr {
             Self::Prefix(op, right) => {
                 match op {
                     Token::Bang => {
-                        if right.eval().is_truthy() { FALSE_OBJ } else { TRUE_OBJ }
+                        if right.eval(environment).is_truthy() { FALSE_OBJ } else { TRUE_OBJ }
                     },
                     Token::Minus => {
-                        match right.eval() {
+                        match right.eval(environment) {
                             ObjectType::Int(val) => ObjectType::Int(-val),
                             ObjectType::Bool(_) => ObjectType::new_error("unknown operator: -BOOLEAN".to_string()),
                             obj => panic!("expected Expr::Int, got {:?}", obj),
@@ -40,8 +41,8 @@ impl Evaluator for Expr {
                 match op {
                     Token::Plus | Token::Minus | Token::Asterisk | Token::Slash | Token::LessThen |
                     Token::GreaterThen => {
-                        let left_val = left.eval();
-                        let right_val = right.eval();
+                        let left_val = left.eval(environment);
+                        let right_val = right.eval(environment);
 
                         match (left_val, right_val) {
                             (ObjectType::Int(l), ObjectType::Int(r)) => {
@@ -61,8 +62,8 @@ impl Evaluator for Expr {
                         }
                     },
                     Token::Eq | Token::NotEq => {
-                        let left_val = left.eval();
-                        let right_val = right.eval();
+                        let left_val = left.eval(environment);
+                        let right_val = right.eval(environment);
 
                         match (left_val, right_val) {
                             (ObjectType::Int(l), ObjectType::Int(r)) => {
@@ -88,20 +89,28 @@ impl Evaluator for Expr {
                 }
             },
             Self::If(condition, consequence, alternative) => {
-                let cond_value = condition.eval();
+                let cond_value = condition.eval(environment);
 
                 if let ObjectType::Error(_) = cond_value {
                     return cond_value;
                 }
 
                 if cond_value.is_truthy() {
-                    consequence.eval()
+                    consequence.eval(environment)
                 } else {
                     if let Some(alt) = alternative {
-                        return alt.eval();
+                        return alt.eval(environment);
                     }
 
                     NULL_OBJ
+                }
+            },
+            Self::Ident(token) => {
+                let ident_val = token.value();
+
+                match environment.get(&ident_val) {
+                    Some(val) => val.clone(),
+                    None => ObjectType::new_error(format!("identifier not found: {}", &ident_val)),
                 }
             },
             expr => ObjectType::new_error(format!("eval is not impemented for {}", expr)),
@@ -110,27 +119,50 @@ impl Evaluator for Expr {
 }
 
 impl Evaluator for Statement {
-    fn eval(self) -> ObjectType {
+    fn eval(self, environment: &mut Environment) -> ObjectType {
         match self {
-            Statement::ExprStatement(expr) => expr.eval(),
-            Statement::Block(stmts) => eval_statements(stmts),
+            Statement::ExprStatement(expr) => expr.eval(environment),
+            Statement::Block(stmts) => eval_statements(stmts, environment),
+            Self::Let(ident, expr) => {
+                let ident_val = match *ident {
+                    Expr::Ident(token) => token.value(),
+                    expr => panic!("expected to be Expr::Ident got {}", expr),
+                };
+
+                match expr {
+                    Some(expr) => {
+                        let object_res = expr.eval(environment);
+
+                        if let ObjectType::Error(_) = object_res {
+                            return object_res;
+                        }
+
+                        environment.set(ident_val, object_res);
+                    },
+                    None => {
+                        environment.set(ident_val, NULL_OBJ);
+                    },
+                };
+
+                NULL_OBJ
+            },
             _ => panic!("given Statement {} is not implemented yet", self),
         }
     }
 }
 
 impl Evaluator for Program {
-    fn eval(self) -> ObjectType {
-        eval_statements(self.children())
+    fn eval(self, environment: &mut Environment) -> ObjectType {
+        eval_statements(self.children(), environment)
     }
 }
 
-fn eval_statements(statements: Vec<Box<Statement>>) -> ObjectType
+fn eval_statements(statements: Vec<Box<Statement>>, environment: &mut Environment) -> ObjectType
 {
     let mut result = NULL_OBJ;
 
     for stmt in statements {
-        result = stmt.eval();
+        result = stmt.eval(environment);
 
         if let ObjectType::Error(_) = result {
             return result;
@@ -148,11 +180,13 @@ mod test {
     use crate::ast::{Expr, Statement};
     use crate::lexer::Lexer;
     use crate::parser::Parser;
+    use crate::environment::Environment;
 
     #[test]
     fn test_eval_integer_expression() {
-        let five = Expr::Int(Token::Int("5".into())).eval();
-        let one_o_nine = Expr::Int(Token::Int("0109".into())).eval();
+        let environment = &mut Environment::new();
+        let five = Expr::Int(Token::Int("5".into())).eval(environment);
+        let one_o_nine = Expr::Int(Token::Int("0109".into())).eval(environment);
 
         assert_eq!(five, ObjectType::Int(5));
         assert_eq!(one_o_nine, ObjectType::Int(109));
@@ -160,8 +194,9 @@ mod test {
 
     #[test]
     fn test_eval_bool_expression() {
-        let true_val = Expr::Bool(Token::True).eval();
-        let false_val = Expr::Bool(Token::False).eval();
+        let environment = &mut Environment::new();
+        let true_val = Expr::Bool(Token::True).eval(environment);
+        let false_val = Expr::Bool(Token::False).eval(environment);
 
         assert_eq!(true_val, TRUE_OBJ);
         assert_eq!(false_val, FALSE_OBJ);
@@ -171,12 +206,14 @@ mod test {
     fn test_eval_expr_statement() {
         let five = Box::new(Expr::Int(Token::Int("5".into())));
         let expr_stmt = Statement::ExprStatement(five);
+        let environment = &mut Environment::new();
 
-        assert_eq!(expr_stmt.eval(), ObjectType::Int(5));
+        assert_eq!(expr_stmt.eval(environment), ObjectType::Int(5));
     }
 
     #[test]
     fn test_bang_operator() {
+        let environment = &mut Environment::new();
         let examples = [
             ("!true", FALSE_OBJ),
             ("!false", TRUE_OBJ),
@@ -186,7 +223,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
 
             assert_eq!(result, *expected);
         }
@@ -194,6 +231,7 @@ mod test {
 
     #[test]
     fn test_minus_prefix_operator() {
+        let environment = &mut Environment::new();
         let examples = [
             ("5", ObjectType::Int(5)),
             ("-5", ObjectType::Int(-5)),
@@ -202,7 +240,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
 
             assert_eq!(result, *expected);
         }
@@ -210,6 +248,7 @@ mod test {
 
     #[test]
     fn test_infix_operator() {
+        let environment = &mut Environment::new();
         let examples = [
             ("5 + 5", ObjectType::Int(10)),
             ("5 - 5", ObjectType::Int(0)),
@@ -224,7 +263,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
 
             assert_eq!(result, *expected);
         }
@@ -232,6 +271,7 @@ mod test {
 
     #[test]
     fn test_if_statements() {
+        let environment = &mut Environment::new();
         let examples = [
             ("if (true) { 10 }", ObjectType::Int(10)),
             ("if (false) { 10 }", ObjectType::Null),
@@ -243,7 +283,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
 
             assert_eq!(result, *expected);
         }
@@ -251,6 +291,7 @@ mod test {
 
     #[test]
     fn test_error_handling() {
+        let environment = &mut Environment::new();
         let examples = [
             ("5 + true", "unknown operator: INTEGER + BOOLEAN"),
             ("5 + true; 5", "unknown operator: INTEGER + BOOLEAN"),
@@ -259,12 +300,30 @@ mod test {
             ("5; false + true; 5", "unknown operator: BOOLEAN + BOOLEAN"),
             ("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
             ("if (-false) { 1 } else { 2 };", "unknown operator: -BOOLEAN"),
+            ("foobar;", "identifier not found: foobar"),
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval();
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
 
             assert_eq!(result, ObjectType::Error(expected.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_let_statements() {
+        let environment = &mut Environment::new();
+        let examples = [
+            ("let a = 5; a;", ObjectType::Int(5)),
+            ("let a = 5 * 5; a;", ObjectType::Int(25)),
+            ("let a = 5; let b = a; b;", ObjectType::Int(5)),
+            ("let a = 5; let b = a; let c = a + b + 5; c;", ObjectType::Int(15)),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+
+            assert_eq!(result, *expected);
         }
     }
 }

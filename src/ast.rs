@@ -5,6 +5,7 @@ pub trait ChildrenStatements {
     fn children(self) -> Vec<Box<Statement>>;
 }
 
+#[derive(PartialEq, Clone)]
 pub enum Expr {
     Ident(Token),
     Int(Token),
@@ -16,6 +17,7 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Box<Expr>>),
 }
 
+#[derive(PartialEq, Clone)]
 pub enum Statement {
     Let(Box<Expr>, Option<Box<Expr>>),
     Return(Box<Expr>),

@@ -1,8 +1,12 @@
+use crate::ast::{Expr, Statement};
+use crate::environment::Environment;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum ObjectType {
     Int(isize),
     Bool(bool),
     Null,
+    Function(Vec<Expr>, Statement, Environment),
     Error(String),
 }
 
@@ -25,6 +29,7 @@ impl std::fmt::Display for ObjectType {
             Self::Int(value) => write!(f, "{}", value),
             Self::Bool(value) => write!(f, "{}", value),
             Self::Null => write!(f, "null"),
+            Self::Function(_, _, _) => write!(f, "FUNCTION OBJECT"),
             Self::Error(str) => write!(f, "Error: {}", str),
         }
     }
@@ -49,6 +54,7 @@ impl ObjectType {
             Self::Int(_) => "INTEGER",
             Self::Bool(_) => "BOOLEAN",
             Self::Null => "NULL",
+            Self::Function(_, _, _) => "FUNCTION",
             Self::Error(_) => "ERROR",
         }
     }

@@ -21,6 +21,8 @@ pub enum Precedence {
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
 
+    // TODO: refactoring
+    // do i really need _Taken for token? maybe better to wrap this to Option<Token>
     cur_token: Token,
     peek_token: Token,
 

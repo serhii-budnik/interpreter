@@ -4,6 +4,7 @@ use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
 
 pub trait Evaluator {
+    // maybe change it to take pointer to self
     fn eval(self, environment: &mut Environment) -> ObjectType;
 }
 

@@ -1,3 +1,5 @@
+use std::rc::Rc;
+use std::cell::RefCell;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io::Write;
@@ -7,7 +9,7 @@ use crate::environment::Environment;
 const PROMPT: &'static str = ">> ";
 
 pub fn start() {
-    let mut env = Environment::new();
+    let env = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         let mut line = String::new();
@@ -33,7 +35,7 @@ pub fn start() {
             continue;
         }
 
-        let evaluated = program.eval(&mut env);
+        let evaluated = program.eval(env.clone());
         println!("{}", evaluated);
 
         println!("")

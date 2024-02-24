@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::ast::{Expr, Program, Statement, ChildrenStatements};
 use crate::environment::Environment;
 use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
@@ -5,11 +7,11 @@ use crate::token::Token;
 
 pub trait Evaluator {
     // maybe change it to take pointer to self
-    fn eval(self, environment: &mut Environment) -> ObjectType;
+    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType;
 }
 
 impl Evaluator for Expr {
-    fn eval(self, environment: &mut Environment) -> ObjectType {
+    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType {
         match self {
             Self::Int(token) => {
                 let int_val: isize = token.value().parse().unwrap();
@@ -42,8 +44,8 @@ impl Evaluator for Expr {
                 match op {
                     Token::Plus | Token::Minus | Token::Asterisk | Token::Slash | Token::LessThen |
                     Token::GreaterThen => {
-                        let left_val = left.eval(environment);
-                        let right_val = right.eval(environment);
+                        let left_val = left.eval(Rc::clone(&environment));
+                        let right_val = right.eval(Rc::clone(&environment));
 
                         match (left_val, right_val) {
                             (ObjectType::Int(l), ObjectType::Int(r)) => {
@@ -63,8 +65,8 @@ impl Evaluator for Expr {
                         }
                     },
                     Token::Eq | Token::NotEq => {
-                        let left_val = left.eval(environment);
-                        let right_val = right.eval(environment);
+                        let left_val = left.eval(Rc::clone(&environment));
+                        let right_val = right.eval(Rc::clone(&environment));
 
                         match (left_val, right_val) {
                             (ObjectType::Int(l), ObjectType::Int(r)) => {
@@ -90,7 +92,7 @@ impl Evaluator for Expr {
                 }
             },
             Self::If(condition, consequence, alternative) => {
-                let cond_value = condition.eval(environment);
+                let cond_value = condition.eval(Rc::clone(&environment));
 
                 if let ObjectType::Error(_) = cond_value {
                     return cond_value;
@@ -109,10 +111,13 @@ impl Evaluator for Expr {
             Self::Ident(token) => {
                 let ident_val = token.value();
 
-                match environment.get(&ident_val) {
+                match (*environment).borrow().get(&ident_val) {
                     Some(val) => val.clone(),
                     None => ObjectType::new_error(format!("identifier not found: {}", &ident_val)),
                 }
+            },
+            Self::Fn(params, body) => {
+                ObjectType::Function(params, body, Rc::clone(&environment))
             },
             expr => ObjectType::new_error(format!("eval is not impemented for {}", expr)),
         }
@@ -120,7 +125,7 @@ impl Evaluator for Expr {
 }
 
 impl Evaluator for Statement {
-    fn eval(self, environment: &mut Environment) -> ObjectType {
+    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType {
         match self {
             Statement::ExprStatement(expr) => expr.eval(environment),
             Statement::Block(stmts) => eval_statements(stmts, environment),
@@ -132,16 +137,16 @@ impl Evaluator for Statement {
 
                 match expr {
                     Some(expr) => {
-                        let object_res = expr.eval(environment);
+                        let object_res = expr.eval(Rc::clone(&environment));
 
                         if let ObjectType::Error(_) = object_res {
                             return object_res;
                         }
 
-                        environment.set(ident_val, object_res);
+                        (*environment).borrow_mut().set(ident_val, object_res);
                     },
                     None => {
-                        environment.set(ident_val, NULL_OBJ);
+                        (*environment).borrow_mut().set(ident_val, NULL_OBJ);
                     },
                 };
 
@@ -153,17 +158,16 @@ impl Evaluator for Statement {
 }
 
 impl Evaluator for Program {
-    fn eval(self, environment: &mut Environment) -> ObjectType {
+    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType {
         eval_statements(self.children(), environment)
     }
 }
 
-fn eval_statements(statements: Vec<Box<Statement>>, environment: &mut Environment) -> ObjectType
-{
+fn eval_statements(statements: Vec<Box<Statement>>, environment: Rc<RefCell<Environment>>) -> ObjectType {
     let mut result = NULL_OBJ;
 
     for stmt in statements {
-        result = stmt.eval(environment);
+        result = stmt.eval(Rc::clone(&environment));
 
         if let ObjectType::Error(_) = result {
             return result;
@@ -175,6 +179,8 @@ fn eval_statements(statements: Vec<Box<Statement>>, environment: &mut Environmen
 
 #[cfg(test)]
 mod test {
+    use std::rc::Rc;
+    use std::cell::RefCell;
     use super::Evaluator;
     use crate::object::{ObjectType, TRUE_OBJ, FALSE_OBJ};
     use crate::token::Token;
@@ -185,9 +191,9 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let environment = &mut Environment::new();
-        let five = Expr::Int(Token::Int("5".into())).eval(environment);
-        let one_o_nine = Expr::Int(Token::Int("0109".into())).eval(environment);
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let five = Expr::Int(Token::Int("5".into())).eval(environment.clone());
+        let one_o_nine = Expr::Int(Token::Int("0109".into())).eval(environment.clone());
 
         assert_eq!(five, ObjectType::Int(5));
         assert_eq!(one_o_nine, ObjectType::Int(109));
@@ -195,9 +201,9 @@ mod test {
 
     #[test]
     fn test_eval_bool_expression() {
-        let environment = &mut Environment::new();
-        let true_val = Expr::Bool(Token::True).eval(environment);
-        let false_val = Expr::Bool(Token::False).eval(environment);
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let true_val = Expr::Bool(Token::True).eval(environment.clone());
+        let false_val = Expr::Bool(Token::False).eval(environment.clone());
 
         assert_eq!(true_val, TRUE_OBJ);
         assert_eq!(false_val, FALSE_OBJ);
@@ -207,14 +213,14 @@ mod test {
     fn test_eval_expr_statement() {
         let five = Box::new(Expr::Int(Token::Int("5".into())));
         let expr_stmt = Statement::ExprStatement(five);
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
 
-        assert_eq!(expr_stmt.eval(environment), ObjectType::Int(5));
+        assert_eq!(expr_stmt.eval(environment.clone()), ObjectType::Int(5));
     }
 
     #[test]
     fn test_bang_operator() {
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
         let examples = [
             ("!true", FALSE_OBJ),
             ("!false", TRUE_OBJ),
@@ -224,7 +230,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, *expected);
         }
@@ -232,7 +238,7 @@ mod test {
 
     #[test]
     fn test_minus_prefix_operator() {
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
         let examples = [
             ("5", ObjectType::Int(5)),
             ("-5", ObjectType::Int(-5)),
@@ -241,7 +247,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, *expected);
         }
@@ -249,7 +255,7 @@ mod test {
 
     #[test]
     fn test_infix_operator() {
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
         let examples = [
             ("5 + 5", ObjectType::Int(10)),
             ("5 - 5", ObjectType::Int(0)),
@@ -264,7 +270,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, *expected);
         }
@@ -272,7 +278,7 @@ mod test {
 
     #[test]
     fn test_if_statements() {
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
         let examples = [
             ("if (true) { 10 }", ObjectType::Int(10)),
             ("if (false) { 10 }", ObjectType::Null),
@@ -284,7 +290,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, *expected);
         }
@@ -292,7 +298,7 @@ mod test {
 
     #[test]
     fn test_error_handling() {
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
         let examples = [
             ("5 + true", "unknown operator: INTEGER + BOOLEAN"),
             ("5 + true; 5", "unknown operator: INTEGER + BOOLEAN"),
@@ -305,7 +311,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, ObjectType::Error(expected.to_string()));
         }
@@ -313,7 +319,7 @@ mod test {
 
     #[test]
     fn test_let_statements() {
-        let environment = &mut Environment::new();
+        let environment = Rc::new(RefCell::new(Environment::new()));
         let examples = [
             ("let a = 5; a;", ObjectType::Int(5)),
             ("let a = 5 * 5; a;", ObjectType::Int(25)),
@@ -322,7 +328,7 @@ mod test {
         ];
 
         for (input, expected) in examples.iter() {
-            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment);
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, *expected);
         }

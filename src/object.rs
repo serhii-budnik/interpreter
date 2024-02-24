@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::ast::{Expr, Statement};
 use crate::environment::Environment;
 
@@ -6,7 +8,7 @@ pub enum ObjectType {
     Int(isize),
     Bool(bool),
     Null,
-    Function(Vec<Expr>, Statement, Environment),
+    Function(Vec<Box<Expr>>, Statement, Rc<RefCell<Environment>>),
     Error(String),
 }
 

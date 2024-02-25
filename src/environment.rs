@@ -28,12 +28,8 @@ impl Environment {
         let res = self.store.get(key);
 
         if res.is_none() && self.outer.is_some() {
-            if let Some(out) = &self.outer {
-                let out: *mut Environment = out.as_ptr();
-                return unsafe { (&*out).get(key) };
-            }
-
-            None
+            let env_pointer: *mut Environment = self.outer.as_ref().unwrap().as_ptr();
+            unsafe { (*env_pointer).get(key) }
         } else {
             res
         }

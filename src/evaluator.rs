@@ -119,7 +119,23 @@ impl Evaluator for Expr {
             Self::Fn(params, body) => {
                 ObjectType::Function(params, body, Rc::clone(&environment))
             },
-            expr => ObjectType::new_error(format!("eval is not impemented for {}", expr)),
+            Self::Call(func, args) => {
+                let func_def = func.eval(environment.clone());
+
+                match func_def {
+                    ObjectType::Function(params, body, env) => {
+                        let extended_env = Rc::new(RefCell::new(Environment::extend_env(env.clone())));
+
+                        if let Err(obj_type) = map_fn_env_params(params, args, extended_env.clone()) {
+                            return obj_type;
+                        }
+
+                        body.eval(extended_env)
+                    },
+                    ObjectType::Error(_) => func_def,
+                    ob_type => panic!("expected ObjectType::Function, got {:?}", ob_type),
+                }
+            },
         }
     }
 }
@@ -175,6 +191,33 @@ fn eval_statements(statements: Vec<Box<Statement>>, environment: Rc<RefCell<Envi
     }
 
     result
+}
+
+fn map_fn_env_params(mut params: Vec<Box<Expr>>, mut args: Vec<Box<Expr>>, env: Rc<RefCell<Environment>>)
+-> Result<(), ObjectType>
+{
+    if params.len() != args.len() {
+        return Err(ObjectType::new_error(format!(
+            "wrong number of arguments: expected {}, got {}",
+            params.len(),
+            args.len()
+        )));
+    }
+
+    for _ in 0..params.len() {
+        let param = params.swap_remove(0);
+        let arg = args.swap_remove(0);
+
+        let param_name = match *param {
+            Expr::Ident(token) => token.value(),
+            expr => panic!("expected to be Expr::Ident got {}", expr),
+        };
+
+        let arg_v = arg.eval(env.clone());
+        (*env).borrow_mut().set(param_name, arg_v);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

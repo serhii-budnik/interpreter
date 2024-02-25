@@ -376,4 +376,21 @@ mod test {
             assert_eq!(result, *expected);
         }
     }
+
+    #[test]
+    fn test_fn_expression() {
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let examples = [
+            ("let a = fn () { 1 + 1 }; a();", ObjectType::Int(2)),
+            ("let a = fn (a, b) { a + b }; a(5, 10);", ObjectType::Int(15)),
+            ("let a = fn () { 1 + 1 }; let b = fn () { a() + 1 }; b();", ObjectType::Int(3)),
+            ("let a = fn () { 1 + 1 }; let b = fn (fun) { fun() + 5 }; b(a);", ObjectType::Int(7)),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
+
+            assert_eq!(result, *expected);
+        }
+    }
 }

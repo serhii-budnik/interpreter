@@ -121,6 +121,7 @@ impl Evaluator for Expr {
             },
             Self::Call(func, args) => {
                 let func_def = func.eval(environment.clone());
+                let args = args.into_iter().map(|arg| arg.eval(environment.clone())).collect();
 
                 match func_def {
                     ObjectType::Function(params, body, env) => {
@@ -193,7 +194,7 @@ fn eval_statements(statements: Vec<Box<Statement>>, environment: Rc<RefCell<Envi
     result
 }
 
-fn map_fn_env_params(mut params: Vec<Box<Expr>>, mut args: Vec<Box<Expr>>, env: Rc<RefCell<Environment>>)
+fn map_fn_env_params(mut params: Vec<Box<Expr>>, mut args: Vec<ObjectType>, env: Rc<RefCell<Environment>>)
 -> Result<(), ObjectType>
 {
     if params.len() != args.len() {
@@ -206,14 +207,17 @@ fn map_fn_env_params(mut params: Vec<Box<Expr>>, mut args: Vec<Box<Expr>>, env: 
 
     for _ in 0..params.len() {
         let param = params.swap_remove(0);
-        let arg = args.swap_remove(0);
+        let arg_v = args.swap_remove(0);
 
         let param_name = match *param {
             Expr::Ident(token) => token.value(),
             expr => panic!("expected to be Expr::Ident got {}", expr),
         };
 
-        let arg_v = arg.eval(env.clone());
+        if let ObjectType::Error(_) = arg_v {
+            return Err(arg_v);
+        }
+
         (*env).borrow_mut().set(param_name, arg_v);
     }
 
@@ -386,6 +390,11 @@ mod test {
             ("let a = fn () { 1 + 1 }; let b = fn () { a() + 1 }; b();", ObjectType::Int(3)),
             ("let a = fn () { 1 + 1 }; let b = fn (fun) { fun() + 5 }; b(a);", ObjectType::Int(7)),
             ("let newAdder = fn(x) { fn(y) { x + y }; }; let addTwo = newAdder(2); addTwo(2); ", ObjectType::Int(4)),
+            ("
+                let add = fn(a, b) { a + b };
+                let applyFunc = fn(a, b, func) { func(a, b) };
+                applyFunc(2, 2, add);
+            ", ObjectType::Int(4)),
         ];
 
         for (input, expected) in examples.iter() {

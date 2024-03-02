@@ -1,11 +1,12 @@
 use crate::token::Token;
+use std::collections::VecDeque;
 use std::fmt::{Display, Debug};
 
 pub trait ChildrenStatements {
     fn children(self) -> Vec<Box<Statement>>;
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone)]
 pub enum Expr {
     Ident(Token),
     Int(Token),
@@ -14,10 +15,10 @@ pub enum Expr {
     Infix(Box<Expr>, Token, Box<Expr>),
     If(Box<Expr>, Box<Statement>, Option<Box<Statement>>),
     Fn(Vec<Box<Expr>>, Statement), // Statement is a Block
-    Call(Box<Expr>, Vec<Box<Expr>>),
+    Call(Box<Expr>, VecDeque<Box<Expr>>),
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone)]
 pub enum Statement {
     Let(Box<Expr>, Option<Box<Expr>>),
     Return(Box<Expr>),

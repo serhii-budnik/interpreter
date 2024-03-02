@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 use crate::ast::{Expr, Program, Statement, ChildrenStatements};
 use crate::environment::Environment;
@@ -6,7 +7,6 @@ use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
 
 pub trait Evaluator {
-    // maybe change it to take pointer to self
     fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType;
 }
 
@@ -108,30 +108,31 @@ impl Evaluator for Expr {
                     NULL_OBJ
                 }
             },
-            Self::Ident(token) => {
-                let ident_val = token.value();
+            Self::Ident(_) => {
+                let key = Rc::new(self);
 
-                match (*environment).borrow().get(&ident_val) {
+                match (*environment).borrow().get(&key) {
                     Some(val) => val.clone(),
-                    None => ObjectType::new_error(format!("identifier not found: {}", &ident_val)),
+                    None => ObjectType::new_error(format!("identifier not found: {}", key.token().as_ref())),
                 }
             },
             Self::Fn(params, body) => {
-                ObjectType::Function(params, body, Rc::clone(&environment))
+                let params = params.into_iter().map(|param| param.into()).collect();
+                ObjectType::new_function(params, body, Rc::clone(&environment))
             },
             Self::Call(func, args) => {
                 let func_def = func.eval(environment.clone());
                 let args = args.into_iter().map(|arg| arg.eval(environment.clone())).collect();
 
                 match func_def {
-                    ObjectType::Function(params, body, env) => {
-                        let extended_env = Rc::new(RefCell::new(Environment::extend_env(env.clone())));
+                    ObjectType::Function(func) => {
+                        let extended_env = Rc::new(RefCell::new(Environment::extend_env(func.2.clone())));
 
-                        if let Err(obj_type) = map_fn_env_params(params, args, extended_env.clone()) {
+                        if let Err(obj_type) = map_fn_env_params(&func.0, args, extended_env.clone()) {
                             return obj_type;
                         }
 
-                        body.eval(extended_env)
+                        func.1.clone().eval(extended_env)
                     },
                     ObjectType::Error(_) => func_def,
                     ob_type => panic!("expected ObjectType::Function, got {:?}", ob_type),
@@ -147,10 +148,7 @@ impl Evaluator for Statement {
             Statement::ExprStatement(expr) => expr.eval(environment),
             Statement::Block(stmts) => eval_statements(stmts, environment),
             Self::Let(ident, expr) => {
-                let ident_val = match *ident {
-                    Expr::Ident(token) => token.value(),
-                    expr => panic!("expected to be Expr::Ident got {}", expr),
-                };
+                let ident = ident.into();
 
                 match expr {
                     Some(expr) => {
@@ -160,10 +158,10 @@ impl Evaluator for Statement {
                             return object_res;
                         }
 
-                        (*environment).borrow_mut().set(ident_val, object_res);
+                        (*environment).borrow_mut().set(ident, object_res);
                     },
                     None => {
-                        (*environment).borrow_mut().set(ident_val, NULL_OBJ);
+                        (*environment).borrow_mut().set(ident, NULL_OBJ);
                     },
                 };
 
@@ -194,7 +192,7 @@ fn eval_statements(statements: Vec<Box<Statement>>, environment: Rc<RefCell<Envi
     result
 }
 
-fn map_fn_env_params(mut params: Vec<Box<Expr>>, mut args: Vec<ObjectType>, env: Rc<RefCell<Environment>>)
+fn map_fn_env_params(params: &Vec<Rc<Expr>>, mut args: VecDeque<ObjectType>, env: Rc<RefCell<Environment>>)
 -> Result<(), ObjectType>
 {
     if params.len() != args.len() {
@@ -205,20 +203,15 @@ fn map_fn_env_params(mut params: Vec<Box<Expr>>, mut args: Vec<ObjectType>, env:
         )));
     }
 
-    for _ in 0..params.len() {
-        let param = params.swap_remove(0);
-        let arg_v = args.swap_remove(0);
-
-        let param_name = match *param {
-            Expr::Ident(token) => token.value(),
-            expr => panic!("expected to be Expr::Ident got {}", expr),
-        };
+    for index in 0..params.len() {
+        let param = params.get(index).unwrap();
+        let arg_v = args.pop_front().unwrap();
 
         if let ObjectType::Error(_) = arg_v {
-            return Err(arg_v);
+            return Err(arg_v.clone());
         }
 
-        (*env).borrow_mut().set(param_name, arg_v);
+        env.borrow_mut().set(param.clone(), arg_v);
     }
 
     Ok(())

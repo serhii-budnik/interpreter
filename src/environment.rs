@@ -1,11 +1,11 @@
-use crate::object::ObjectType;
+use crate::{object::ObjectType, ast::Expr};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
-    store: HashMap<String, ObjectType>,
+    store: HashMap<Rc<Expr>, ObjectType>,
     outer: Option<Rc<RefCell<Environment>>>,
 }
 
@@ -24,7 +24,7 @@ impl Environment {
         }
     }
 
-    pub fn get(& self, key: &str) -> Option<&ObjectType> {
+    pub fn get(&self, key: &Rc<Expr>) -> Option<&ObjectType> {
         let res = self.store.get(key);
 
         if res.is_none() && self.outer.is_some() {
@@ -35,7 +35,7 @@ impl Environment {
         }
     }
 
-    pub fn set(&mut self, key: String, value: ObjectType) {
+    pub fn set(&mut self, key: Rc<Expr>, value: ObjectType) {
         self.store.insert(key, value);
     }
 }

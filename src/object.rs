@@ -8,7 +8,7 @@ pub enum ObjectType {
     Int(isize),
     Bool(bool),
     Null,
-    Function(Vec<Box<Expr>>, Statement, Rc<RefCell<Environment>>),
+    Function(Rc<(Vec<Rc<Expr>>, Statement, Rc<RefCell<Environment>>)>),
     Error(String),
 }
 
@@ -31,7 +31,7 @@ impl std::fmt::Display for ObjectType {
             Self::Int(value) => write!(f, "{}", value),
             Self::Bool(value) => write!(f, "{}", value),
             Self::Null => write!(f, "null"),
-            Self::Function(_, _, _) => write!(f, "FUNCTION OBJECT"),
+            Self::Function(_) => write!(f, "FUNCTION OBJECT"),
             Self::Error(str) => write!(f, "Error: {}", str),
         }
     }
@@ -56,9 +56,17 @@ impl ObjectType {
             Self::Int(_) => "INTEGER",
             Self::Bool(_) => "BOOLEAN",
             Self::Null => "NULL",
-            Self::Function(_, _, _) => "FUNCTION",
+            Self::Function(_) => "FUNCTION",
             Self::Error(_) => "ERROR",
         }
+    }
+
+    pub fn new_function(
+        parameters: Vec<Rc<Expr>>,
+        body: Statement,
+        env: Rc<RefCell<Environment>>,
+    ) -> ObjectType {
+        ObjectType::Function(Rc::new((parameters, body, env)))
     }
 }
 

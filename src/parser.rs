@@ -3,7 +3,7 @@ use crate::{
     token::Token,
     ast::{ Expr, Program, Statement },
 };
-
+use std::collections::VecDeque;
 use std::mem;
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -331,8 +331,8 @@ impl<'a> Parser<'a> {
         Ok(Box::new(Expr::Call(function, args)))
     }
 
-    pub fn parse_call_args(&mut self) -> Result<Vec<Box<Expr>>, String> {
-        let mut args = Vec::new();
+    pub fn parse_call_args(&mut self) -> Result<VecDeque<Box<Expr>>, String> {
+        let mut args = VecDeque::new();
 
         if self.peek_token == Token::Rparen {
             self.next_token();
@@ -343,14 +343,14 @@ impl<'a> Parser<'a> {
         self.next_token();
 
         let arg = self.parse_expression(Precedence::Lowest)?;
-        args.push(arg);
+        args.push_back(arg);
 
         while self.peek_token == Token::Comma {
             self.next_token();
             self.next_token();
 
             let arg = self.parse_expression(Precedence::Lowest)?;
-            args.push(arg);
+            args.push_back(arg);
         }
 
         if self.peek_token != Token::Rparen {

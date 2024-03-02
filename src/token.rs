@@ -1,8 +1,9 @@
 use std::{fmt::Display, mem};
+use std::convert::AsRef;
 
 use crate::parser::Precedence;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Eq, Hash, Debug, PartialEq, Clone)]
 pub enum Token {
     Illegal,
     Eof,
@@ -133,6 +134,15 @@ impl Display for Token {
         };
 
         write!(f, "{}", stringified_token)
+    }
+}
+
+impl AsRef<String> for Token {
+    fn as_ref(&self) -> &String {
+        match self {
+            Self::Ident(s) | Self::Int(s) => s,
+            _ => panic!("Token::as_ref() called on non-value token"),
+        }
     }
 }
 

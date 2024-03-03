@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::{
     lexer::Lexer,
     token::Token,
@@ -118,7 +119,7 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        Ok(Box::new(Statement::Let(Box::new(identifier), Some(value))))
+        Ok(Box::new(Statement::Let(Rc::new(identifier), Some(value))))
     }
 
     fn parse_return_statement(&mut self) -> Result<Box<Statement>, String> {
@@ -157,9 +158,9 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    fn parse_identifier(&mut self) -> Result<Box<Expr>, String> {
+    fn parse_identifier(&mut self) -> Result<Expr, String> {
         let token = self.cur_token.take();
-        Ok(Box::new(Expr::Ident(token)))
+        Ok(Expr::Ident(token))
     }
 
     fn parse_integer_literal(&mut self) -> Result<Box<Expr>, String> {
@@ -299,10 +300,10 @@ impl<'a> Parser<'a> {
 
         let body = self.parse_block_statement()?;
 
-        Ok(Box::new(Expr::Fn(params, body)))
+        Ok(Box::new(Expr::Fn(params, Rc::new(body))))
     }
 
-    pub fn parse_function_parameters(&mut self) -> Result<Vec<Box<Expr>>, String> {
+    pub fn parse_function_parameters(&mut self) -> Result<Vec<Rc<Expr>>, String> {
         let mut identifiers = Vec::new();
 
         while self.peek_token != Token::Rparen && self.peek_token != Token::Eof {
@@ -313,7 +314,7 @@ impl<'a> Parser<'a> {
             self.next_token();
 
             let ident = self.parse_identifier()?;
-            identifiers.push(ident);
+            identifiers.push(Rc::new(ident));
 
             if self.peek_token == Token::Comma {
                 self.next_token();
@@ -364,7 +365,10 @@ impl<'a> Parser<'a> {
 
     pub fn parse_prefix(&mut self) -> Result<Box<Expr>, String> {
         match &self.cur_token {
-            Token::Ident(_) => self.parse_identifier(),
+            Token::Ident(_) => {
+                let ident = self.parse_identifier()?;
+                Ok(Box::new(ident))
+            },
             Token::Int(_) => self.parse_integer_literal(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             Token::True | Token::False => self.parse_boolean(),
@@ -403,6 +407,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod test {
+    use std::rc::Rc;
     use crate::{
         ast::{ Expr, Statement },
         lexer::Lexer,
@@ -436,15 +441,15 @@ mod test {
 
         let tests = [
             Statement::Let(
-                Box::new(Expr::Ident(Token::Ident("x".to_string()))),
+                Rc::new(Expr::Ident(Token::Ident("x".to_string()))),
                 Some(Box::new(Expr::Int(Token::Int("5".into()))))
             ),
             Statement::Let(
-                Box::new(Expr::Ident(Token::Ident("y".to_string()))),
+                Rc::new(Expr::Ident(Token::Ident("y".to_string()))),
                 Some(Box::new(Expr::Int(Token::Int("10".into()))))
             ),
             Statement::Let(
-                Box::new(Expr::Ident(Token::Ident("foobar".to_string()))),
+                Rc::new(Expr::Ident(Token::Ident("foobar".to_string()))),
                 Some(Box::new(Expr::Int(Token::Int("848484".into()))))
             ),
         ];

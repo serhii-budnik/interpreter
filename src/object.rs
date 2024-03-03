@@ -8,7 +8,7 @@ pub enum ObjectType {
     Int(isize),
     Bool(bool),
     Null,
-    Function(Rc<(Vec<Rc<Expr>>, Statement, Rc<RefCell<Environment>>)>),
+    Function(Rc<(Vec<Rc<Expr>>, Rc<Statement>, Rc<RefCell<Environment>>)>),
     Error(String),
 }
 
@@ -63,7 +63,7 @@ impl ObjectType {
 
     pub fn new_function(
         parameters: Vec<Rc<Expr>>,
-        body: Statement,
+        body: Rc<Statement>,
         env: Rc<RefCell<Environment>>,
     ) -> ObjectType {
         ObjectType::Function(Rc::new((parameters, body, env)))

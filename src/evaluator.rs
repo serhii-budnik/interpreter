@@ -1,20 +1,20 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use crate::ast::{Expr, Program, Statement, ChildrenStatements};
+use crate::ast::{Expr, Program, Statement};
 use crate::environment::Environment;
 use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
 
 pub trait Evaluator {
-    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType;
+    fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType;
 }
 
 impl Evaluator for Expr {
-    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType {
+    fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType {
         match self {
             Self::Int(token) => {
-                let int_val: isize = token.value().parse().unwrap();
+                let int_val: isize = token.as_ref().parse().unwrap();
 
                 ObjectType::Int(int_val)
             },
@@ -109,22 +109,20 @@ impl Evaluator for Expr {
                 }
             },
             Self::Ident(_) => {
-                let key = Rc::new(self);
-
-                match (*environment).borrow().get(&key) {
+                match (*environment).borrow().get(self) {
                     Some(val) => val.clone(),
-                    None => ObjectType::new_error(format!("identifier not found: {}", key.token().as_ref())),
+                    None => ObjectType::new_error(format!("identifier not found: {}", self.token().as_ref())),
                 }
             },
             Self::Fn(params, body) => {
-                let params = params.into_iter().map(|param| param.into()).collect();
-                ObjectType::new_function(params, body, Rc::clone(&environment))
+                let params: Vec<Rc<Expr>> = params.iter().map(|param| param.clone()).collect();
+                ObjectType::new_function(params, body.clone(), Rc::clone(&environment))
             },
-            Self::Call(func, args) => {
-                let func_def = func.eval(environment.clone());
+            Self::Call(func_name, args) => {
+                let func_definition = func_name.eval(environment.clone());
                 let args = args.into_iter().map(|arg| arg.eval(environment.clone())).collect();
 
-                match func_def {
+                match func_definition {
                     ObjectType::Function(func) => {
                         let extended_env = Rc::new(RefCell::new(Environment::extend_env(func.2.clone())));
 
@@ -134,7 +132,7 @@ impl Evaluator for Expr {
 
                         func.1.clone().eval(extended_env)
                     },
-                    ObjectType::Error(_) => func_def,
+                    ObjectType::Error(_) => func_definition,
                     ob_type => panic!("expected ObjectType::Function, got {:?}", ob_type),
                 }
             },
@@ -143,13 +141,11 @@ impl Evaluator for Expr {
 }
 
 impl Evaluator for Statement {
-    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType {
+    fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType {
         match self {
             Statement::ExprStatement(expr) => expr.eval(environment),
             Statement::Block(stmts) => eval_statements(stmts, environment),
             Self::Let(ident, expr) => {
-                let ident = ident.into();
-
                 match expr {
                     Some(expr) => {
                         let object_res = expr.eval(Rc::clone(&environment));
@@ -158,10 +154,10 @@ impl Evaluator for Statement {
                             return object_res;
                         }
 
-                        (*environment).borrow_mut().set(ident, object_res);
+                        (*environment).borrow_mut().set(ident.clone(), object_res);
                     },
                     None => {
-                        (*environment).borrow_mut().set(ident, NULL_OBJ);
+                        (*environment).borrow_mut().set(ident.clone(), NULL_OBJ);
                     },
                 };
 
@@ -173,12 +169,12 @@ impl Evaluator for Statement {
 }
 
 impl Evaluator for Program {
-    fn eval(self, environment: Rc<RefCell<Environment>>) -> ObjectType {
-        eval_statements(self.children(), environment)
+    fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType {
+        eval_statements(self.statements(), environment)
     }
 }
 
-fn eval_statements(statements: Vec<Box<Statement>>, environment: Rc<RefCell<Environment>>) -> ObjectType {
+fn eval_statements(statements: &Vec<Box<Statement>>, environment: Rc<RefCell<Environment>>) -> ObjectType {
     let mut result = NULL_OBJ;
 
     for stmt in statements {

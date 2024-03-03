@@ -1,10 +1,7 @@
+use std::rc::Rc;
 use crate::token::Token;
 use std::collections::VecDeque;
 use std::fmt::{Display, Debug};
-
-pub trait ChildrenStatements {
-    fn children(self) -> Vec<Box<Statement>>;
-}
 
 #[derive(Eq, Hash, PartialEq, Clone)]
 pub enum Expr {
@@ -14,13 +11,13 @@ pub enum Expr {
     Prefix(Token, Box<Expr>),
     Infix(Box<Expr>, Token, Box<Expr>),
     If(Box<Expr>, Box<Statement>, Option<Box<Statement>>),
-    Fn(Vec<Box<Expr>>, Statement), // Statement is a Block
+    Fn(Vec<Rc<Expr>>, Rc<Statement>), // Statement is a Block
     Call(Box<Expr>, VecDeque<Box<Expr>>),
 }
 
 #[derive(Eq, Hash, PartialEq, Clone)]
 pub enum Statement {
-    Let(Box<Expr>, Option<Box<Expr>>),
+    Let(Rc<Expr>, Option<Box<Expr>>),
     Return(Box<Expr>),
     ExprStatement(Box<Expr>),
     Block(Vec<Box<Statement>>),
@@ -37,12 +34,6 @@ impl Program {
 
     pub fn statements(&self) -> &Vec<Box<Statement>> {
         &self.statements
-    }
-}
-
-impl ChildrenStatements for Program {
-   fn children(self) -> Vec<Box<Statement>> {
-        self.statements
     }
 }
 
@@ -164,19 +155,10 @@ impl Statement {
         }
     }
 
-    pub fn name(&self) -> &Box<Expr> {
+    pub fn name(&self) -> &Rc<Expr> {
         match self {
             Self::Let(ident, _) => ident,
             _ => todo!(),
-        }
-    }
-}
-
-impl ChildrenStatements for Statement {
-   fn children(self) -> Vec<Box<Statement>> {
-        match self {
-            Self::Block(statements) => statements,
-            s => panic!("not implemented for {}", s),
         }
     }
 }
@@ -234,6 +216,7 @@ impl Debug for Program {
 
 #[cfg(test)]
 mod test {
+    use std::rc::Rc;
     use crate::token::Token;
     use super::{
         Program,
@@ -246,7 +229,7 @@ mod test {
         let program = Program {
             statements: vec![
                 Box::new(Statement::Let(
-                    Box::new(Expr::Ident(Token::Ident("myVar".to_string()))),
+                    Rc::new(Expr::Ident(Token::Ident("myVar".to_string()))),
                     Some(Box::new(Expr::Ident(
                         Token::Ident("anotherVar".to_string()),
                     ))),
@@ -311,14 +294,14 @@ mod test {
     fn to_string_converts_fn_expression_to_readable_code() {
         let program = Expr::Fn(
             vec![
-                Box::new(Expr::Ident(
+                Rc::new(Expr::Ident(
                     Token::Ident("x".to_string()),
                 )),
-                Box::new(Expr::Ident(
+                Rc::new(Expr::Ident(
                     Token::Ident("y".to_string()),
                 )),
             ],
-            Statement::Block(
+            Rc::new(Statement::Block(
                 vec![
                     Box::new(Statement::ExprStatement(
                         Box::new(Expr::Infix(
@@ -332,7 +315,7 @@ mod test {
                         )),
                     )),
                 ],
-            ),
+            )),
         );
 
         assert_eq!(program.to_string(), "fn(x, y) {\n(x + y);\n}");

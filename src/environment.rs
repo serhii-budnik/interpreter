@@ -24,7 +24,7 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, key: &Rc<Expr>) -> Option<&ObjectType> {
+    pub fn get(&self, key: &Expr) -> Option<&ObjectType> {
         let res = self.store.get(key);
 
         if res.is_none() && self.outer.is_some() {

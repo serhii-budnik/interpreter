@@ -1,10 +1,11 @@
-use std::cell::RefCell;
-use std::collections::VecDeque;
-use std::rc::Rc;
 use crate::ast::{Expr, Program, Statement};
+use crate::builtins::BUILTIN_FNS;
 use crate::environment::Environment;
 use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::rc::Rc;
 
 pub trait Evaluator {
     fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType;
@@ -132,7 +133,15 @@ impl Evaluator for Expr {
 
                         func.1.clone().eval(extended_env)
                     },
-                    ObjectType::Error(_) => func_definition,
+                    ObjectType::Error(err) => {
+                        let fn_name: &str = func_name.as_ref();
+                        let builtin_fn = BUILTIN_FNS.get(fn_name);
+
+                        match builtin_fn {
+                            Some(builtin_fn) => builtin_fn(args),
+                            None => ObjectType::new_error(err),
+                        }
+                    },
                     ob_type => panic!("expected ObjectType::Function, got {:?}", ob_type),
                 }
             },

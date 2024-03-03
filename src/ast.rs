@@ -53,6 +53,22 @@ impl Expr {
     }
 }
 
+impl AsRef<str> for Box<Expr> {
+    fn as_ref(&self) -> &str {
+        let expr: &Expr = self.as_ref();
+        expr.as_ref()
+    }
+}
+
+impl AsRef<str> for Expr {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Ident(token) | Self::Int(token) => token.as_ref(),
+            _ => panic!("not expected as_ref call on non-ident or non-int token"),
+        }
+    }
+}
+
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -137,8 +137,8 @@ impl Display for Token {
     }
 }
 
-impl AsRef<String> for Token {
-    fn as_ref(&self) -> &String {
+impl AsRef<str> for Token {
+    fn as_ref(&self) -> &str {
         match self {
             Self::Ident(s) | Self::Int(s) => s,
             _ => panic!("Token::as_ref() called on non-value token"),

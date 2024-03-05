@@ -8,6 +8,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 
 pub trait Evaluator {
+    // try to convert it to &mut self
     fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType;
 }
 
@@ -114,6 +115,9 @@ impl Evaluator for Expr {
                     Some(val) => val.clone(),
                     None => ObjectType::new_error(format!("identifier not found: {}", self.token().as_ref())),
                 }
+            },
+            Self::EString(str) => {
+                ObjectType::OString(Rc::new(RefCell::new(str.as_ref().to_string())))
             },
             Self::Fn(params, body) => {
                 let params: Vec<Rc<Expr>> = params.iter().map(|param| param.clone()).collect();

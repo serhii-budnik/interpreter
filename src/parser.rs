@@ -219,6 +219,10 @@ impl<'a> Parser<'a> {
         Ok(Box::new(Expr::Bool(self.cur_token.take())))
     }
 
+    pub fn parse_string(&mut self) -> Result<Box<Expr>, String> {
+        Ok(Box::new(Expr::EString(self.cur_token.take())))
+    }
+
     pub fn parse_grouped_expression(&mut self) -> Result<Box<Expr>, String> {
         self.next_token();
 
@@ -372,6 +376,7 @@ impl<'a> Parser<'a> {
             Token::Int(_) => self.parse_integer_literal(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             Token::True | Token::False => self.parse_boolean(),
+            Token::TString(_) => self.parse_string(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
             Token::Function => self.parse_fn_expression(),

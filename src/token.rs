@@ -11,6 +11,7 @@ pub enum Token {
     // Identifiers + literals
     Ident(String), // add, foobar, x, y, ...
     Int(String), // 1343456
+    TString(String), // "hello world"
 
     // Operators
     Assign,
@@ -102,7 +103,7 @@ impl Default for Token {
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let stringified_token = match self {
-            Self::Ident(s) | Self::Int(s) => s,
+            Self::Ident(s) | Self::Int(s) | Self::TString(s) => s,
             Self::Illegal => "Illegal",
             Self::Eof => "Eof",
             Self::Assign => "=",
@@ -140,7 +141,7 @@ impl Display for Token {
 impl AsRef<str> for Token {
     fn as_ref(&self) -> &str {
         match self {
-            Self::Ident(s) | Self::Int(s) => s,
+            Self::Ident(s) | Self::Int(s) | Self::TString(s) => s,
             _ => panic!("Token::as_ref() called on non-value token"),
         }
     }

@@ -7,6 +7,7 @@ use std::fmt::{Display, Debug};
 pub enum Expr {
     Ident(Token),
     Int(Token),
+    EString(Token),
     Bool(Token),
     Prefix(Token, Box<Expr>),
     Infix(Box<Expr>, Token, Box<Expr>),
@@ -43,6 +44,7 @@ impl Expr {
         match self {
             Self::Ident(token) => token.clone(),
             Self::Int(i) => Token::Int(i.to_string()),
+            Self::EString(s) => Token::TString(s.to_string()),
             Self::Bool(t) => t.clone(),
             Self::Prefix(token, _) => token.clone(),
             Self::Infix(_, token, _) => token.clone(),
@@ -74,6 +76,7 @@ impl Display for Expr {
         match self {
             Self::Ident(token) => write!(f, "{}", token),
             Self::Int(i) => write!(f, "{}", i),
+            Self::EString(s) => write!(f, "\"{}\"", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Prefix(token, expr) => write!(f, "({}{})", token, expr),
             Self::Infix(left, token, right) => write!(f, "({} {} {})", left, token, right),
@@ -106,6 +109,7 @@ impl Debug for Expr {
         match self {
             Self::Ident(token) => write!(f, "{:?}", token),
             Self::Int(i) => write!(f, "{:?}", i),
+            Self::EString(s) => write!(f, "{:?}", s),
             Self::Bool(b) => write!(f, "{:?}", b),
             Self::Prefix(token, expr) => {
                 f.debug_struct("Prefix")

@@ -9,6 +9,7 @@ pub enum ObjectType {
     Bool(bool),
     Null,
     Function(Rc<(Vec<Rc<Expr>>, Rc<Statement>, Rc<RefCell<Environment>>)>),
+    OString(Rc<RefCell<String>>),
     Error(String),
 }
 
@@ -29,6 +30,7 @@ impl std::fmt::Display for ObjectType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::Int(value) => write!(f, "{}", value),
+            Self::OString(value) => write!(f, "\"{}\"", value.borrow()),
             Self::Bool(value) => write!(f, "{}", value),
             Self::Null => write!(f, "null"),
             Self::Function(_) => write!(f, "FUNCTION OBJECT"),
@@ -54,6 +56,7 @@ impl ObjectType {
     pub fn type_name(&self) -> &str {
         match self {
             Self::Int(_) => "INTEGER",
+            Self::OString(_) => "STRING",
             Self::Bool(_) => "BOOLEAN",
             Self::Null => "NULL",
             Self::Function(_) => "FUNCTION",

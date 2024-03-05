@@ -4,7 +4,7 @@ page 150
 
 Evaluating Expressions
 
-## Interpreter supports functions, higher-order functions, closures and integers and arithmetic.
+## Interpreter supports functions, higher-order functions, closures, strings, integers and arithmetic.
 
 Example of usage
 ```
@@ -18,4 +18,6 @@ res
 puts(res);
 => 4
 => null
+
+"this is a string";
 ```

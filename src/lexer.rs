@@ -69,15 +69,21 @@ impl<'a> Lexer<'a> {
             Some('*') => Token::Asterisk,
             Some('-') => Token::Minus,
             Some('/') => Token::Slash,
+            Some('"') => {
+                let string = self.read_string();
+                Token::TString(string)
+            },
             Some(ch) => {
                 if self.is_letter(ch) {
                     let ident = self.read_identifier();
                     return Token::lookup_ident(&ident)
-                } else if self.is_digit(ch) {
-                    return Token::Int(self.read_number())
-                } else {
-                    Token::Illegal
                 }
+
+                if self.is_digit(ch) {
+                    return Token::Int(self.read_number())
+                }
+
+                Token::Illegal
             },
             None => Token::Eof,
         };
@@ -111,6 +117,21 @@ impl<'a> Lexer<'a> {
         }
 
         number
+    }
+
+    fn read_string(&mut self) -> String {
+        self.read_char();
+
+        let mut str_val = String::new();
+
+        while let Some(ch) = self.ch {
+            if ch == '"' { break }
+
+            str_val.push(ch);
+            self.read_char();
+        }
+
+        str_val
     }
 
     fn is_letter(&self, ch: char) -> bool {
@@ -154,6 +175,31 @@ mod test {
         ];
 
         for expected_token in expected_tokens {
+            assert_eq!(expected_token, lexer.next_token());
+        }
+    }
+
+    #[test]
+    fn test_read_string() {
+        let input = r#"
+            "hello world";
+            let a = "b";
+        "#.trim();
+
+        let mut lexer = Lexer::new(input);
+
+        let expected_tokens = [
+            Token::TString("hello world".into()),
+            Token::Semicolon,
+            Token::Let,
+            Token::Ident("a".into()),
+            Token::Assign,
+            Token::TString("b".into()),
+            Token::Semicolon,
+        ];
+
+        for expected_token in expected_tokens {
+            dbg!(&expected_token);
             assert_eq!(expected_token, lexer.next_token());
         }
     }

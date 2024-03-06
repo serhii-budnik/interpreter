@@ -21,4 +21,8 @@ puts(res);
 => null
 
 "this is a string";
+
+len("Hello" + " " + "World!")
+=> 12
+
 ```

@@ -227,7 +227,7 @@ mod test {
     use std::rc::Rc;
     use std::cell::RefCell;
     use super::Evaluator;
-    use crate::object::{ObjectType, TRUE_OBJ, FALSE_OBJ};
+    use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
     use crate::token::Token;
     use crate::ast::{Expr, Statement};
     use crate::lexer::Lexer;
@@ -396,6 +396,25 @@ mod test {
                 let applyFunc = fn(a, b, func) { func(a, b) };
                 applyFunc(2, 2, add);
             ", ObjectType::Int(4)),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
+
+            assert_eq!(result, *expected);
+        }
+    }
+
+    #[test]
+    fn test_built_in_functions() {
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let examples = [
+            ("len(\"\")", ObjectType::Int(0)),
+            ("len(\"four\")", ObjectType::Int(4)),
+            ("len(\"hello world\")", ObjectType::Int(11)),
+            ("len(1)", ObjectType::Error("argument to `len` not supported, got INTEGER".to_string())),
+            ("len()", ObjectType::Error("got no arguments, expected 1".to_string())),
+            ("puts(\"hello\")", NULL_OBJ),
         ];
 
         for (input, expected) in examples.iter() {

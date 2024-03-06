@@ -35,8 +35,7 @@ impl Evaluator for Expr {
                     Token::Minus => {
                         match right.eval(environment) {
                             ObjectType::Int(val) => ObjectType::Int(-val),
-                            ObjectType::Bool(_) => ObjectType::new_error("unknown operator: -BOOLEAN".to_string()),
-                            obj => panic!("expected Expr::Int, got {:?}", obj),
+                            obj => ObjectType::new_error(format!("unknown operator: -{}", obj.type_name())),
                         }
                     }
                     op => panic!("eval for prefix operator not implemented {}", op),
@@ -45,7 +44,7 @@ impl Evaluator for Expr {
             Self::Infix(left, op, right) => {
                 match op {
                     Token::Plus | Token::Minus | Token::Asterisk | Token::Slash | Token::LessThen |
-                    Token::GreaterThen => {
+                    Token::GreaterThen | Token::Eq | Token::NotEq => {
                         let left_val = left.eval(Rc::clone(&environment));
                         let right_val = right.eval(Rc::clone(&environment));
 
@@ -58,21 +57,6 @@ impl Evaluator for Expr {
                                     Token::Slash => ObjectType::Int(l / r),
                                     Token::LessThen => ObjectType::Bool(l < r),
                                     Token::GreaterThen => ObjectType::Bool(l > r),
-                                    _ => panic!("expected infix operator, got {:?}", op),
-                                }
-                            },
-                            (l, r) => ObjectType::new_error(
-                                format!("unknown operator: {} {} {}", l.type_name(), op, r.type_name())
-                            ),
-                        }
-                    },
-                    Token::Eq | Token::NotEq => {
-                        let left_val = left.eval(Rc::clone(&environment));
-                        let right_val = right.eval(Rc::clone(&environment));
-
-                        match (left_val, right_val) {
-                            (ObjectType::Int(l), ObjectType::Int(r)) => {
-                                match op {
                                     Token::Eq => ObjectType::Bool(l == r),
                                     Token::NotEq => ObjectType::Bool(l != r),
                                     _ => panic!("expected infix operator, got {:?}", op),
@@ -82,11 +66,23 @@ impl Evaluator for Expr {
                                 match op {
                                     Token::Eq => ObjectType::Bool(l == r),
                                     Token::NotEq => ObjectType::Bool(l != r),
-                                    _ => panic!("expected infix operator, got {:?}", op),
+                                    _ => ObjectType::new_error(format!("unknown operator: BOOLEAN {} BOOLEAN", op)),
                                 }
                             },
+                            (ObjectType::OString(l), ObjectType::OString(r)) => {
+                                    match op {
+                                        Token::Plus => {
+                                            ObjectType::OString(
+                                                Rc::new(RefCell::new(format!("{}{}", l.borrow(), r.borrow()))),
+                                            )
+                                        },
+                                        _ => ObjectType::new_error(
+                                            format!("unknown operator: STRING {} STRING", op)
+                                        ),
+                                    }
+                                }
                             (l, r) => ObjectType::new_error(
-                                format!("type mismatch: {} {} {}", l.type_name(), op, r.type_name())
+                                format!("unknown operator: {} {} {}", l.type_name(), op, r.type_name())
                             ),
                         }
                     },
@@ -316,6 +312,7 @@ mod test {
             ("5 != 5", FALSE_OBJ),
             ("5 > 6", FALSE_OBJ),
             ("5 < 6", TRUE_OBJ),
+            ("\"str1\" + \"str2\"", ObjectType::OString(Rc::new(RefCell::new("str1str2".to_string())))),
         ];
 
         for (input, expected) in examples.iter() {
@@ -353,6 +350,8 @@ mod test {
             ("5 + true; 5", "unknown operator: INTEGER + BOOLEAN"),
             ("-true", "unknown operator: -BOOLEAN"),
             ("true + false", "unknown operator: BOOLEAN + BOOLEAN"),
+            ("\"str1\" - \"str2\"", "unknown operator: STRING - STRING"),
+            ("-\"str1\"", "unknown operator: -STRING"),
             ("5; false + true; 5", "unknown operator: BOOLEAN + BOOLEAN"),
             ("if (10 > 1) { true + false; }", "unknown operator: BOOLEAN + BOOLEAN"),
             ("if (-false) { 1 } else { 2 };", "unknown operator: -BOOLEAN"),

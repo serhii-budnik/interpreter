@@ -1,6 +1,7 @@
+* implement string escaping "123\"456" => "123"456"
 * return is not implemented yet (want to keep it in fn only)
 
-page 150
+page 157
 
 Evaluating Expressions
 

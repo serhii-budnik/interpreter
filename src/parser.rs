@@ -226,9 +226,18 @@ impl<'a> Parser<'a> {
     pub fn parse_array(&mut self) -> Result<Box<Expr>, String> {
         self.next_token();
 
+        let elements = self.parse_expression_list(Token::RBracket)?;
+
+        Ok(Box::new(Expr::Array(elements)))
+    }
+
+    /// parses list of expressions separated by comma
+    /// till it reaches end\_token
+    /// e.g. 1, 2, 3, 4, 5) -> end\_token = Rparen
+    pub fn parse_expression_list(&mut self, end_token: Token) -> Result<Vec<Box<Expr>>, String> {
         let mut elements = Vec::new();
 
-        while self.cur_token != Token::RBracket {
+        while self.cur_token != end_token {
             if !self.cur_token.is_data_type() {
                 return Err(format!("expected next token to be data type, got {:?} instead", &self.cur_token));
             }
@@ -240,12 +249,14 @@ impl<'a> Parser<'a> {
 
             if self.cur_token == Token::Comma {
                 self.next_token();
-            } else if self.cur_token != Token::RBracket {
-                return Err(format!("expected next token to be Comma or RBracket, got {:?} instead", &self.cur_token));
+            } else if self.cur_token != end_token {
+                return Err(
+                    format!("expected next token to be Comma or {:?}, got {:?} instead", end_token, &self.cur_token),
+                );
             }
         };
 
-        Ok(Box::new(Expr::Array(elements)))
+        Ok(elements)
     }
 
     pub fn parse_grouped_expression(&mut self) -> Result<Box<Expr>, String> {
@@ -347,6 +358,8 @@ impl<'a> Parser<'a> {
 
             if self.peek_token == Token::Comma {
                 self.next_token();
+            } else if self.peek_token != Token::Rparen {
+                return Err(self.peek_err_msg(Token::Rparen));
             }
         }
 
@@ -896,6 +909,7 @@ mod test {
         let input = r#"
             fn (x) { return x }
             fn (x, y) { return x + y; }
+            fn (x,) { x; }
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -906,6 +920,7 @@ mod test {
         let tests = [
             "fn(x) {\nreturn x;\n};",
             "fn(x, y) {\nreturn (x + y);\n};",
+            "fn(x) {\nx;\n};",
         ].iter().map(|s| s.to_string());
 
         assert_eq!(parser.errors(), &Vec::<String>::new());

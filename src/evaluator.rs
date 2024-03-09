@@ -115,7 +115,10 @@ impl Evaluator for Expr {
             Self::EString(str) => {
                 ObjectType::OString(Rc::new(RefCell::new(str.as_ref().to_string())))
             },
-            Self::Array(elements) => {
+            Self::Array(_elements) => {
+                todo!()
+            },
+            Self::IndexExpr(_left, _index) => {
                 todo!()
             },
             Self::Fn(params, body) => {

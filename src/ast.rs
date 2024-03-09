@@ -9,12 +9,14 @@ pub enum Expr {
     Int(Token),
     EString(Token),
     Array(Vec<Box<Expr>>),
+    IndexExpr(Box<Expr>, Box<Expr>), // array[5]
     Bool(Token),
     Prefix(Token, Box<Expr>),
     Infix(Box<Expr>, Token, Box<Expr>),
     If(Box<Expr>, Box<Statement>, Option<Box<Statement>>),
     Fn(Vec<Rc<Expr>>, Rc<Statement>), // Statement is a Block
     Call(Box<Expr>, VecDeque<Box<Expr>>),
+
 }
 
 #[derive(Eq, Hash, PartialEq, Clone)]
@@ -47,6 +49,7 @@ impl Expr {
             Self::Int(i) => Token::Int(i.to_string()),
             Self::EString(s) => Token::TString(s.to_string()),
             Self::Array(_) => Token::LBracket,
+            Self::IndexExpr(_, _) => Token::LBracket,
             Self::Bool(t) => t.clone(),
             Self::Prefix(token, _) => token.clone(),
             Self::Infix(_, token, _) => token.clone(),
@@ -84,6 +87,7 @@ impl Display for Expr {
                 "[{}]",
                 arrays.iter().map(|array| array.to_string()).collect::<Vec<String>>().join(", "),
             ),
+            Self::IndexExpr(left, index) => write!(f, "{}[{}]", left, index),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Prefix(token, expr) => write!(f, "({}{})", token, expr),
             Self::Infix(left, token, right) => write!(f, "({} {} {})", left, token, right),
@@ -120,6 +124,12 @@ impl Debug for Expr {
             Self::Array(arrays) => {
                 f.debug_list()
                     .entries(arrays.iter().map(|array| format!("{:#?}", array)))
+                    .finish()
+            },
+            Self::IndexExpr(left, index) => {
+                f.debug_struct("IndexExpr")
+                    .field("left", &format_args!("{:#?}", left))
+                    .field("index", &format_args!("{:#?}", index))
                     .finish()
             },
             Self::Bool(b) => write!(f, "{:?}", b),

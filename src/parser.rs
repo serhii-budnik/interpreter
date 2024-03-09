@@ -16,6 +16,7 @@ pub enum Precedence {
     Product, // *
     Prefix, // -X or !X
     Call, // myFunction(X)
+    IndexExpr // array[0]
 }
 
 #[derive(Debug)]
@@ -439,13 +440,28 @@ impl<'a> Parser<'a> {
             Token::LessThen |
             Token::GreaterThen => self.parse_infix_expression(left),
             Token::Lparen => self.parse_call_expression(left),
+            Token::LBracket => self.parse_index_expression(left),
             token => {
-                let valid_tokens = "Plus, Minus, Slash, Asterisk, Eq, NotEq, LessThen, GreaterThen";
+                let valid_tokens = "Plus, Minus, Slash, Asterisk, Eq, NotEq, LessThen, GreaterThen, Lparen, LBracket";
                 let reference = "See src/token.rs #map_precedence for reference";
 
                 Err(format!("expected tokens to parse infix are ({}), got {}\n{}", valid_tokens, token, reference))
             },
         }
+    }
+
+    fn parse_index_expression(&mut self, left: Box<Expr>) -> Result<Box<Expr>, String> {
+        self.next_token();
+
+        let right = self.parse_expression(Precedence::Lowest)?;
+
+        if self.peek_token != Token::RBracket {
+            return Err(self.peek_err_msg(Token::RBracket));
+        };
+
+        self.next_token();
+
+        Ok(Box::new(Expr::IndexExpr(left, right)))
     }
 }
 
@@ -777,6 +793,8 @@ mod test {
             a + add(b * c) + d;
             add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8));
             add(a + b + c * d / f + g);
+            a * [1, 2, 3, 4][b * c] * d;
+            add(a * b[2], b[1], 2 * [1, 2][1]);
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -809,6 +827,8 @@ mod test {
             "((a + add((b * c))) + d);",
             "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)));",
             "add((((a + b) + ((c * d) / f)) + g));",
+            "((a * [1, 2, 3, 4][(b * c)]) * d);",
+            "add((a * b[2]), b[1], (2 * [1, 2][1]));",
         ].iter().map(|s| s.to_string());
 
         assert_eq!(parser.errors(), &Vec::<String>::new());
@@ -1004,5 +1024,35 @@ mod test {
             "expected next token to be Comma or RBracket, got Int(\"2\") instead".to_string(),
             "expected next token to be data type, got Comma instead".to_string(),
         ]);
+    }
+
+    #[test]
+    fn test_index_expr() {
+        let input = r#"
+            myArray[1 + 1];
+            myArray[0];
+            myArray[first];
+            [0,1][0];
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        assert_eq!(parser.errors, Vec::<String>::new());
+
+        let tests = [
+            "myArray[(1 + 1)];",
+            "myArray[0];",
+            "myArray[first];",
+            "[0, 1][0];",
+        ].iter().map(|s| s.to_string());
+
+        assert_eq!(parser.errors, Vec::<String>::new());
+
+        for (index, test) in tests.enumerate() {
+            assert_eq!(program.statements()[index].to_string(), test);
+        }
     }
 }

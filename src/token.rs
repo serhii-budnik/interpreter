@@ -80,6 +80,7 @@ impl Token {
             Self::Plus | Self::Minus => Precedence::Sum,
             Self::Slash | Self::Asterisk => Precedence::Product,
             Self::Lparen => Precedence::Call,
+            Self::LBracket => Precedence::IndexExpr,
             _ => Precedence::Lowest,
         }
     }

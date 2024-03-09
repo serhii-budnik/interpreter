@@ -54,6 +54,8 @@ impl<'a> Lexer<'a> {
             Some(')') => Token::Rparen,
             Some('{') => Token::Lbrace,
             Some('}') => Token::Rbrace,
+            Some('[') => Token::LBracket,
+            Some(']') => Token::RBracket,
             Some('+') => Token::Plus,
             Some(',') => Token::Comma,
             Some('<') => Token::LessThen,
@@ -215,6 +217,7 @@ mod test {
             };
 
             let result = add(five, ten);
+            [1, 2];
         "#.trim();
 
         let mut lexer = Lexer::new(input);
@@ -255,6 +258,12 @@ mod test {
             Token::Comma,
             Token::Ident("ten".into()),
             Token::Rparen,
+            Token::Semicolon,
+            Token::LBracket,
+            Token::Int("1".into()),
+            Token::Comma,
+            Token::Int("2".into()),
+            Token::RBracket,
             Token::Semicolon,
             Token::Eof,
         ];

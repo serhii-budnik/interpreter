@@ -30,6 +30,8 @@ pub enum Token {
     Rparen,
     Lbrace,
     Rbrace,
+    LBracket,
+    RBracket,
     LessThen,
     GreaterThen,
 
@@ -120,6 +122,8 @@ impl Display for Token {
             Self::Rparen => ")",
             Self::Lbrace => "{",
             Self::Rbrace => "}",
+            Self::LBracket => "[",
+            Self::RBracket => "]",
             Self::LessThen => "<",
             Self::GreaterThen => ">",
             Self::Function => "fn",

@@ -223,6 +223,31 @@ impl<'a> Parser<'a> {
         Ok(Box::new(Expr::EString(self.cur_token.take())))
     }
 
+    pub fn parse_array(&mut self) -> Result<Box<Expr>, String> {
+        self.next_token();
+
+        let mut elements = Vec::new();
+
+        while self.cur_token != Token::RBracket {
+            if !self.cur_token.is_data_type() {
+                return Err(format!("expected next token to be data type, got {:?} instead", &self.cur_token));
+            }
+
+            let res = self.parse_expression(Precedence::Lowest)?;
+            elements.push(res);
+
+            self.next_token();
+
+            if self.cur_token == Token::Comma {
+                self.next_token();
+            } else if self.cur_token != Token::RBracket {
+                return Err(format!("expected next token to be Comma or RBracket, got {:?} instead", &self.cur_token));
+            }
+        };
+
+        Ok(Box::new(Expr::Array(elements)))
+    }
+
     pub fn parse_grouped_expression(&mut self) -> Result<Box<Expr>, String> {
         self.next_token();
 
@@ -377,6 +402,7 @@ impl<'a> Parser<'a> {
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             Token::True | Token::False => self.parse_boolean(),
             Token::TString(_) => self.parse_string(),
+            Token::LBracket => self.parse_array(),
             Token::Lparen => self.parse_grouped_expression(),
             Token::If => self.parse_if_expression(),
             Token::Function => self.parse_fn_expression(),
@@ -915,5 +941,53 @@ mod test {
         for (index, test) in tests.enumerate() {
             assert_eq!(program.statements()[index].to_string(), test);
         }
+    }
+
+    #[test]
+    fn test_parsing_array() {
+        let input = r#"
+            [1, 2 * 2, 3 + 3];
+            [1, 2, 3, false, "test"];
+            [1,];
+            [];
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program();
+
+        let tests = [
+            "[1, (2 * 2), (3 + 3)];",
+            "[1, 2, 3, false, \"test\"];",
+            "[1];",
+            "[];",
+        ].iter().map(|s| s.to_string());
+
+        assert_eq!(parser.errors, Vec::<String>::new());
+
+        for (index, test) in tests.enumerate() {
+            assert_eq!(program.statements()[index].to_string(), test);
+        }
+    }
+
+    #[test]
+    fn test_invalid_array_syntax() {
+        let input = r#"
+            [1, 2 * 2, 3 + 3;
+            [1 2];
+            [,];
+        "#.trim();
+
+        let lexer = Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let _ = parser.parse_program();
+
+        assert_eq!(parser.errors, vec![
+            "expected next token to be Comma or RBracket, got Semicolon instead".to_string(),
+            "expected next token to be Comma or RBracket, got Int(\"2\") instead".to_string(),
+            "expected next token to be data type, got Comma instead".to_string(),
+        ]);
     }
 }

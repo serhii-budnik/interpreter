@@ -115,6 +115,9 @@ impl Evaluator for Expr {
             Self::EString(str) => {
                 ObjectType::OString(Rc::new(RefCell::new(str.as_ref().to_string())))
             },
+            Self::Array(elements) => {
+                todo!()
+            },
             Self::Fn(params, body) => {
                 let params: Vec<Rc<Expr>> = params.iter().map(|param| param.clone()).collect();
                 ObjectType::new_function(params, body.clone(), Rc::clone(&environment))

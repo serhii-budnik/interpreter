@@ -88,6 +88,13 @@ impl Token {
         mem::take(self)
     }
 
+    pub fn is_data_type(&self) -> bool {
+        match self {
+            Self::Int(_) | Self::TString(_) | Self::Ident(_) | Self::True | Self::False => true,
+            _ => false,
+        }
+    }
+
     pub fn value(self) -> String {
         match self {
             Self::Ident(s) | Self::Int(s) => s,

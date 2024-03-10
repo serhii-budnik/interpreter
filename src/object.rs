@@ -9,6 +9,7 @@ pub enum ObjectType {
     Bool(bool),
     Null,
     Function(Rc<(Vec<Rc<Expr>>, Rc<Statement>, Rc<RefCell<Environment>>)>),
+    Array(Rc<Vec<ObjectType>>),
     OString(Rc<RefCell<String>>),
     Error(String),
 }
@@ -34,6 +35,15 @@ impl std::fmt::Display for ObjectType {
             Self::Bool(value) => write!(f, "{}", value),
             Self::Null => write!(f, "null"),
             Self::Function(_) => write!(f, "FUNCTION OBJECT"),
+            Self::Array(value) => {
+                let mut arr = Vec::with_capacity(value.len());
+
+                for val in value.iter() {
+                    arr.push(val.to_string());
+                };
+
+                write!(f, "[{}]", arr.join(", "))
+            }
             Self::Error(str) => write!(f, "Error: {}", str),
         }
     }
@@ -60,6 +70,7 @@ impl ObjectType {
             Self::Bool(_) => "BOOLEAN",
             Self::Null => "NULL",
             Self::Function(_) => "FUNCTION",
+            Self::Array(_) => "ARRAY",
             Self::Error(_) => "ERROR",
         }
     }

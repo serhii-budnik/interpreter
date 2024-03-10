@@ -114,8 +114,15 @@ impl Evaluator for Expr {
             Self::EString(str) => {
                 ObjectType::OString(Rc::new(RefCell::new(str.as_ref().to_string())))
             },
-            Self::Array(_elements) => {
-                todo!()
+            Self::Array(elements) => {
+                let mut array_of_objects: Vec<ObjectType> = Vec::with_capacity(elements.len());
+
+                for el in elements {
+                    let object = el.eval(environment.clone());
+                    array_of_objects.push(object);
+                };
+
+                ObjectType::Array(Rc::new(array_of_objects))
             },
             Self::IndexExpr(_left, _index) => {
                 todo!()
@@ -425,6 +432,30 @@ mod test {
             let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
 
             assert_eq!(result, *expected);
-        }
+        };
+    }
+
+    #[test]
+    fn test_arrays() {
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let examples = [
+            ("[1, 2 * 2, 3 + 3]", ObjectType::Array(Rc::new(vec![
+                ObjectType::Int(1),
+                ObjectType::Int(4),
+                ObjectType::Int(6),
+            ]))),
+            ("[1, false, \"string\",]", ObjectType::Array(Rc::new(vec![
+                ObjectType::Int(1),
+                FALSE_OBJ,
+                ObjectType::OString(Rc::new(RefCell::new("string".to_string()))),
+            ]))),
+            ("[]", ObjectType::Array(Rc::new(vec![]))),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
+
+            assert_eq!(result, *expected);
+        };
     }
 }

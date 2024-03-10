@@ -20,6 +20,7 @@ fn len(args: Vec<ObjectType>) -> ObjectType {
 
     match first_arg {
         ObjectType::OString(s) => ObjectType::Int(s.borrow().len() as isize),
+        ObjectType::Array(arr) => ObjectType::Int(arr.len() as isize),
         _ => ObjectType::new_error(format!("argument to `len` not supported, got {}", first_arg.type_name())),
     }
 }

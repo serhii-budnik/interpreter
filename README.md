@@ -29,6 +29,8 @@ puts(res);
 // built-in functions
 len("Hello" + " " + "World!")
 => 12
+len([1, 2, false, "string"])
+=> 4
 
 // arrays
 let a = [1, 2, false, "string"];

@@ -1,8 +1,7 @@
 use crate::object::{ObjectType, NULL_OBJ};
-use std::collections::VecDeque;
 use ::phf::{Map, phf_map};
 
-fn puts(args: VecDeque<ObjectType>) -> ObjectType {
+fn puts(args: Vec<ObjectType>) -> ObjectType {
     let first_arg = match args.get(0) {
         Some(arg) => arg,
         None => return ObjectType::new_error("got no arguments, expected 1".to_string()),
@@ -13,7 +12,7 @@ fn puts(args: VecDeque<ObjectType>) -> ObjectType {
     NULL_OBJ
 }
 
-fn len(args: VecDeque<ObjectType>) -> ObjectType {
+fn len(args: Vec<ObjectType>) -> ObjectType {
     let first_arg = match args.get(0) {
         Some(arg) => arg,
         None => return ObjectType::new_error("got no arguments, expected 1".to_string()),
@@ -25,7 +24,7 @@ fn len(args: VecDeque<ObjectType>) -> ObjectType {
     }
 }
 
-pub static BUILTIN_FNS: Map<&'static str, fn(VecDeque<ObjectType>) -> ObjectType> = phf_map! {
+pub static BUILTIN_FNS: Map<&'static str, fn(Vec<ObjectType>) -> ObjectType> = phf_map! {
     "puts" => puts,
     "len" => len,
 };

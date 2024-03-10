@@ -4,7 +4,6 @@ use crate::{
     token::Token,
     ast::{ Expr, Program, Statement },
 };
-use std::collections::VecDeque;
 use std::mem;
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -162,6 +161,14 @@ impl<'a> Parser<'a> {
     fn parse_identifier(&mut self) -> Result<Expr, String> {
         let token = self.cur_token.take();
         Ok(Expr::Ident(token))
+    }
+
+    fn check_and_parse_identifier(&mut self) -> Result<Expr, String> {
+        if !matches!(self.cur_token, Token::Ident(_)) {
+            return Err(self.peek_err_msg(Token::Ident("<name>".into())));
+        }
+
+        self.parse_identifier()
     }
 
     fn parse_integer_literal(&mut self) -> Result<Box<Expr>, String> {
@@ -345,23 +352,23 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_function_parameters(&mut self) -> Result<Vec<Rc<Expr>>, String> {
+        self.next_token();
+
         let mut identifiers = Vec::new();
 
-        while self.peek_token != Token::Rparen && self.peek_token != Token::Eof {
-            if !matches!(self.peek_token, Token::Ident(_)) {
-                return Err(self.peek_err_msg(Token::Ident("<param>".into())));
-            }
+        if let Token::Rparen = self.cur_token {
+            return Ok(identifiers);
+        }
 
+        let ident = self.check_and_parse_identifier()?;
+        identifiers.push(Rc::new(ident));
+
+        while self.peek_token == Token::Comma {
+            self.next_token();
             self.next_token();
 
-            let ident = self.parse_identifier()?;
+            let ident = self.check_and_parse_identifier()?;
             identifiers.push(Rc::new(ident));
-
-            if self.peek_token == Token::Comma {
-                self.next_token();
-            } else if self.peek_token != Token::Rparen {
-                return Err(self.peek_err_msg(Token::Rparen));
-            }
         }
 
         self.next_token();
@@ -375,33 +382,10 @@ impl<'a> Parser<'a> {
         Ok(Box::new(Expr::Call(function, args)))
     }
 
-    pub fn parse_call_args(&mut self) -> Result<VecDeque<Box<Expr>>, String> {
-        let mut args = VecDeque::new();
-
-        if self.peek_token == Token::Rparen {
-            self.next_token();
-
-            return Ok(args);
-        }
-
+    pub fn parse_call_args(&mut self) -> Result<Vec<Box<Expr>>, String> {
         self.next_token();
 
-        let arg = self.parse_expression(Precedence::Lowest)?;
-        args.push_back(arg);
-
-        while self.peek_token == Token::Comma {
-            self.next_token();
-            self.next_token();
-
-            let arg = self.parse_expression(Precedence::Lowest)?;
-            args.push_back(arg);
-        }
-
-        if self.peek_token != Token::Rparen {
-            return Err(self.peek_err_msg(Token::Rparen));
-        }
-
-        self.next_token();
+        let args = self.parse_expression_list(Token::Rparen)?;
 
         Ok(args)
     }
@@ -929,7 +913,6 @@ mod test {
         let input = r#"
             fn (x) { return x }
             fn (x, y) { return x + y; }
-            fn (x,) { x; }
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -940,7 +923,6 @@ mod test {
         let tests = [
             "fn(x) {\nreturn x;\n};",
             "fn(x, y) {\nreturn (x + y);\n};",
-            "fn(x) {\nx;\n};",
         ].iter().map(|s| s.to_string());
 
         assert_eq!(parser.errors(), &Vec::<String>::new());

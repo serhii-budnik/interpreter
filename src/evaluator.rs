@@ -4,7 +4,6 @@ use crate::environment::Environment;
 use crate::object::{ObjectType, FALSE_OBJ, NULL_OBJ, TRUE_OBJ};
 use crate::token::Token;
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::rc::Rc;
 
 pub trait Evaluator {
@@ -203,7 +202,7 @@ fn eval_statements(statements: &Vec<Box<Statement>>, environment: Rc<RefCell<Env
     result
 }
 
-fn map_fn_env_params(params: &Vec<Rc<Expr>>, mut args: VecDeque<ObjectType>, env: Rc<RefCell<Environment>>)
+fn map_fn_env_params(params: &Vec<Rc<Expr>>, args: Vec<ObjectType>, env: Rc<RefCell<Environment>>)
 -> Result<(), ObjectType>
 {
     if params.len() != args.len() {
@@ -214,16 +213,15 @@ fn map_fn_env_params(params: &Vec<Rc<Expr>>, mut args: VecDeque<ObjectType>, env
         )));
     }
 
-    for index in 0..params.len() {
+    for (index, arg) in args.into_iter().enumerate() {
         let param = params.get(index).unwrap();
-        let arg_v = args.pop_front().unwrap();
 
-        if let ObjectType::Error(_) = arg_v {
-            return Err(arg_v.clone());
+        if let ObjectType::Error(_) = arg {
+            return Err(arg.clone());
         }
 
-        env.borrow_mut().set(param.clone(), arg_v);
-    }
+        env.borrow_mut().set(param.clone(), arg);
+    };
 
     Ok(())
 }

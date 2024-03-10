@@ -1,8 +1,9 @@
 * async if you are brave enough :)
 * implement string escaping "123\"456" => "123"456"
 * return is not implemented yet (want to keep it in fn only)
+* implement array slicing (tail built-in fn)
 
-page 172
+page 180
 
 Evaluating Expressions
 

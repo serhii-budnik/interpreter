@@ -939,6 +939,8 @@ mod test {
             add(1);
             add(1, 2 * 3);
             add(1, bar(5), x + 1);
+            add([]);
+            add([2 * 5]);
         "#.trim();
 
         let lexer = Lexer::new(&input);
@@ -951,6 +953,8 @@ mod test {
             "add(1);",
             "add(1, (2 * 3));",
             "add(1, bar(5), (x + 1));",
+            "add([]);",
+            "add([(2 * 5)]);",
         ].iter().map(|s| s.to_string());
 
         assert_eq!(parser.errors, Vec::<String>::new());

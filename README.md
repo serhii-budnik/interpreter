@@ -30,6 +30,15 @@ puts(res);
 len("Hello" + " " + "World!")
 => 12
 
-// arrays WIP
+// arrays
+let a = [1, 2, false, "string"];
+a[0]
+=> 1
+
+a[3]
+=> "string"
+
+a[4]
+=> index out of range: 4
 
 ```

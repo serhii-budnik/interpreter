@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub trait Evaluator {
-    // try to convert it to &mut self
+    // TODO: check if instead of using ObjectType::Error we can use Result<ObjType, String>
     fn eval(&self, environment: Rc<RefCell<Environment>>) -> ObjectType;
 }
 
@@ -124,8 +124,31 @@ impl Evaluator for Expr {
 
                 ObjectType::Array(Rc::new(array_of_objects))
             },
-            Self::IndexExpr(_left, _index) => {
-                todo!()
+            Self::IndexExpr(left, index) => {
+                let array_object = left.eval(environment.clone());
+                let index = index.eval(environment.clone());
+
+                match array_object {
+                    ObjectType::Array(array) => {
+                        if let ObjectType::Int(index) = index {
+                            let max_index = array.len() as isize - 1;
+
+                            if index < 0 || index > max_index {
+                                return ObjectType::new_error(format!(
+                                    "index out of bounds: index={}, max_index={}",
+                                    index,
+                                    max_index
+                                ));
+                            }
+
+                            return array[index as usize].clone();
+                        };
+
+                        ObjectType::new_error(format!("received {} as index, expected Integer", index.type_name()))
+                    },
+                    ObjectType::Error(_) => array_object,
+                    obj => panic!("received {} Object, Array expected", obj.type_name()),
+                }
             },
             Self::Fn(params, body) => {
                 let params: Vec<Rc<Expr>> = params.iter().map(|param| param.clone()).collect();
@@ -450,6 +473,26 @@ mod test {
                 ObjectType::OString(Rc::new(RefCell::new("string".to_string()))),
             ]))),
             ("[]", ObjectType::Array(Rc::new(vec![]))),
+        ];
+
+        for (input, expected) in examples.iter() {
+            let result = Parser::new(Lexer::new(input)).parse_program().eval(environment.clone());
+
+            assert_eq!(result, *expected);
+        };
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let environment = Rc::new(RefCell::new(Environment::new()));
+        let examples = [
+            ("[1, 2, 3][0]", ObjectType::Int(1)),
+            ("[1, 2, 3][1]", ObjectType::Int(2)),
+            ("[1, 2, 3][2]", ObjectType::Int(3)),
+            ("[1, 2, 3][1 + 1];", ObjectType::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[2];", ObjectType::Int(3)),
+            ("let myArray = [1, 2, 3]; myArray[3];", ObjectType::Error("index out of bounds: index=3, max_index=2".to_string())),
+            ("let myArray = [1, 2, 3]; myArray[-1];", ObjectType::Error("index out of bounds: index=-1, max_index=2".to_string())),
         ];
 
         for (input, expected) in examples.iter() {

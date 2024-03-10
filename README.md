@@ -27,6 +27,21 @@ puts(res);
 // strings
 "this is a string";
 
+// strings can be mutable
+let arr = ["string is too long"]
+let first = arr[0]
+
+first
+=> "string is too long"
+
+truncate(first, 3)
+first
+=> "str"
+
+arr
+=> ["str"]
+
+
 // built-in functions
 len("Hello" + " " + "World!")
 => 12

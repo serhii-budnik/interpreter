@@ -90,10 +90,7 @@ impl Token {
     }
 
     pub fn is_data_type(&self) -> bool {
-        match self {
-            Self::Int(_) | Self::TString(_) | Self::Ident(_) | Self::True | Self::False | Self::LBracket => true,
-            _ => false,
-        }
+        matches!(self, Self::Int(_) | Self::TString(_) | Self::Ident(_) | Self::True | Self::False | Self::LBracket)
     }
 
     pub fn value(self) -> String {

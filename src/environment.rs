@@ -3,20 +3,13 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Environment {
     store: HashMap<Rc<Expr>, ObjectType>,
     outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
-    pub fn new() -> Environment {
-        Environment {
-            store: HashMap::new(),
-            outer: None,
-        }
-    }
-
     pub fn extend_env(outer: Rc<RefCell<Environment>>) -> Self {
         Environment {
             store: HashMap::new(),
@@ -40,8 +33,8 @@ impl Environment {
     }
 }
 
-impl Into<Rc<RefCell<Environment>>> for Environment {
-    fn into(self) -> Rc<RefCell<Environment>> {
-        Rc::new(RefCell::new(self))
+impl From<Rc<RefCell<Environment>>> for Environment {
+    fn from(env: Rc<RefCell<Environment>>) -> Self {
+        env.borrow().clone()
     }
 }

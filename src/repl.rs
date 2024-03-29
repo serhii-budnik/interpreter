@@ -6,7 +6,7 @@ use std::io::Write;
 use crate::evaluator::Evaluator;
 use crate::environment::Environment;
 
-const PROMPT: &'static str = ">> ";
+const PROMPT: &str = ">> ";
 
 pub fn start() {
     let env = Rc::new(RefCell::new(Environment::new()));

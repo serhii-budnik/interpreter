@@ -137,7 +137,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn is_letter(&self, ch: char) -> bool {
-        ('a'..='z').contains(&ch) || ('A'..='Z').contains(&ch) || ch == '_'
+        ch.is_ascii_lowercase() || ch.is_ascii_uppercase() || ch == '_'
     }
 
     fn skip_whitespace(&mut self) {
@@ -150,7 +150,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn is_digit(&self, ch: char) -> bool {
-        ('0'..='9').contains(&ch)
+        ch.is_ascii_digit()
     }
 }
 

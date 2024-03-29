@@ -26,6 +26,39 @@ impl Evaluator for Expr {
                     _ => panic!("expected Expr::Bool, got {:?}", token),
                 }
             },
+            Self::EString(str) => {
+                ObjectType::OString(Rc::new(RefCell::new(str.as_ref().to_string())))
+            },
+            Self::Fn(params, body) => {
+                let params = params.to_vec();
+                ObjectType::new_function(params, body.clone(), Rc::clone(&environment))
+            },
+            Self::Call(func_name, args) => {
+                let func_definition = func_name.eval(environment.clone());
+                let args = args.iter().map(|arg| arg.eval(environment.clone())).collect();
+
+                match func_definition {
+                    ObjectType::Function(func) => {
+                        let extended_env = Rc::new(RefCell::new(Environment::extend_env(func.2.clone())));
+
+                        if let Err(obj_type) = map_fn_env_params(&func.0, args, extended_env.clone()) {
+                            return obj_type;
+                        }
+
+                        func.1.clone().eval(extended_env)
+                    },
+                    ObjectType::Error(err) => {
+                        let fn_name: &str = func_name.as_ref();
+                        let builtin_fn = BUILTIN_FNS.get(fn_name);
+
+                        match builtin_fn {
+                            Some(builtin_fn) => builtin_fn(args),
+                            None => ObjectType::new_error(err),
+                        }
+                    },
+                    ob_type => panic!("expected ObjectType::Function, got {:?}", ob_type),
+                }
+            },
             Self::Prefix(op, right) => {
                 match op {
                     Token::Bang => {
@@ -111,9 +144,6 @@ impl Evaluator for Expr {
                     None => ObjectType::new_error(format!("identifier not found: {}", self.token().as_ref())),
                 }
             },
-            Self::EString(str) => {
-                ObjectType::OString(Rc::new(RefCell::new(str.as_ref().to_string())))
-            },
             Self::Array(elements) => {
                 let mut array_of_objects: Vec<ObjectType> = Vec::with_capacity(elements.len());
 
@@ -126,7 +156,7 @@ impl Evaluator for Expr {
             },
             Self::IndexExpr(left, index) => {
                 let array_object = left.eval(environment.clone());
-                let index = index.eval(environment.clone());
+                let index = index.eval(environment);
 
                 match array_object {
                     ObjectType::Array(array) => {
@@ -148,36 +178,6 @@ impl Evaluator for Expr {
                     },
                     ObjectType::Error(_) => array_object,
                     obj => panic!("received {} Object, Array expected", obj.type_name()),
-                }
-            },
-            Self::Fn(params, body) => {
-                let params: Vec<Rc<Expr>> = params.iter().map(|param| param.clone()).collect();
-                ObjectType::new_function(params, body.clone(), Rc::clone(&environment))
-            },
-            Self::Call(func_name, args) => {
-                let func_definition = func_name.eval(environment.clone());
-                let args = args.into_iter().map(|arg| arg.eval(environment.clone())).collect();
-
-                match func_definition {
-                    ObjectType::Function(func) => {
-                        let extended_env = Rc::new(RefCell::new(Environment::extend_env(func.2.clone())));
-
-                        if let Err(obj_type) = map_fn_env_params(&func.0, args, extended_env.clone()) {
-                            return obj_type;
-                        }
-
-                        func.1.clone().eval(extended_env)
-                    },
-                    ObjectType::Error(err) => {
-                        let fn_name: &str = func_name.as_ref();
-                        let builtin_fn = BUILTIN_FNS.get(fn_name);
-
-                        match builtin_fn {
-                            Some(builtin_fn) => builtin_fn(args),
-                            None => ObjectType::new_error(err),
-                        }
-                    },
-                    ob_type => panic!("expected ObjectType::Function, got {:?}", ob_type),
                 }
             },
         }
@@ -247,7 +247,7 @@ fn map_fn_env_params(params: &Vec<Rc<Expr>>, args: Vec<ObjectType>, env: Rc<RefC
         let param = params.get(index).unwrap();
 
         if let ObjectType::Error(_) = arg {
-            return Err(arg.clone());
+            return Err(arg);
         }
 
         env.borrow_mut().set(param.clone(), arg);
@@ -270,9 +270,9 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let five = Expr::Int(Token::Int("5".into())).eval(environment.clone());
-        let one_o_nine = Expr::Int(Token::Int("0109".into())).eval(environment.clone());
+        let one_o_nine = Expr::Int(Token::Int("0109".into())).eval(environment);
 
         assert_eq!(five, ObjectType::Int(5));
         assert_eq!(one_o_nine, ObjectType::Int(109));
@@ -280,9 +280,9 @@ mod test {
 
     #[test]
     fn test_eval_bool_expression() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let true_val = Expr::Bool(Token::True).eval(environment.clone());
-        let false_val = Expr::Bool(Token::False).eval(environment.clone());
+        let false_val = Expr::Bool(Token::False).eval(environment);
 
         assert_eq!(true_val, TRUE_OBJ);
         assert_eq!(false_val, FALSE_OBJ);
@@ -292,14 +292,14 @@ mod test {
     fn test_eval_expr_statement() {
         let five = Box::new(Expr::Int(Token::Int("5".into())));
         let expr_stmt = Statement::ExprStatement(five);
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
 
-        assert_eq!(expr_stmt.eval(environment.clone()), ObjectType::Int(5));
+        assert_eq!(expr_stmt.eval(environment), ObjectType::Int(5));
     }
 
     #[test]
     fn test_bang_operator() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("!true", FALSE_OBJ),
             ("!false", TRUE_OBJ),
@@ -317,7 +317,7 @@ mod test {
 
     #[test]
     fn test_minus_prefix_operator() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("5", ObjectType::Int(5)),
             ("-5", ObjectType::Int(-5)),
@@ -334,7 +334,7 @@ mod test {
 
     #[test]
     fn test_infix_operator() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("5 + 5", ObjectType::Int(10)),
             ("5 - 5", ObjectType::Int(0)),
@@ -358,7 +358,7 @@ mod test {
 
     #[test]
     fn test_if_statements() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("if (true) { 10 }", ObjectType::Int(10)),
             ("if (false) { 10 }", ObjectType::Null),
@@ -378,7 +378,7 @@ mod test {
 
     #[test]
     fn test_error_handling() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("5 + true", "unknown operator: INTEGER + BOOLEAN"),
             ("5 + true; 5", "unknown operator: INTEGER + BOOLEAN"),
@@ -401,7 +401,7 @@ mod test {
 
     #[test]
     fn test_let_statements() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("let a = 5; a;", ObjectType::Int(5)),
             ("let a = 5 * 5; a;", ObjectType::Int(25)),
@@ -418,7 +418,7 @@ mod test {
 
     #[test]
     fn test_fn_expression() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("let a = fn () { 1 + 1 }; a();", ObjectType::Int(2)),
             ("let a = fn (a, b) { a + b }; a(5, 10);", ObjectType::Int(15)),
@@ -441,7 +441,7 @@ mod test {
 
     #[test]
     fn test_built_in_functions() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("len(\"\")", ObjectType::Int(0)),
             ("len(\"four\")", ObjectType::Int(4)),
@@ -460,7 +460,7 @@ mod test {
 
     #[test]
     fn test_arrays() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("[1, 2 * 2, 3 + 3]", ObjectType::Array(Rc::new(vec![
                 ObjectType::Int(1),
@@ -484,7 +484,7 @@ mod test {
 
     #[test]
     fn test_index_expressions() {
-        let environment = Rc::new(RefCell::new(Environment::new()));
+        let environment = Rc::new(RefCell::new(Environment::default()));
         let examples = [
             ("[1, 2, 3][0]", ObjectType::Int(1)),
             ("[1, 2, 3][1]", ObjectType::Int(2)),

@@ -9,7 +9,7 @@ use crate::environment::Environment;
 const PROMPT: &str = ">> ";
 
 pub fn start() {
-    let env = Rc::new(RefCell::new(Environment::new()));
+    let env = Rc::new(RefCell::new(Environment::default()));
 
     loop {
         let mut line = String::new();
@@ -38,6 +38,6 @@ pub fn start() {
         let evaluated = program.eval(env.clone());
         println!("{}", evaluated);
 
-        println!("")
+        println!()
     }
 }
